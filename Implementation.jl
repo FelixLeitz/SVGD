@@ -26,10 +26,13 @@ begin
 end
 
 # ╔═╡ ac557ab9-97a8-42d8-ba5d-5a5551f68985
-@bind np Slider(1:100,show_value=true)
+@bind np Slider(1:100,default=20,show_value=true)
 
 # ╔═╡ 4acab3cb-1c55-4663-afb0-f1d2003533b6
 @bind ni Slider(1:100,show_value=true)
+
+# ╔═╡ bbbdc869-4635-4049-b43b-59b23f410fb1
+@bind stepsize Slider(0.01:0.01:1,default=1,show_value=true)
 
 # ╔═╡ acb67c33-0b23-459e-aa82-a84687a15de2
 begin
@@ -43,9 +46,7 @@ end
 # ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
 begin
 function logp(xj)
-	σ=2
-	μ=0
-	return log(1/(σ*sqrt(2*pi))*exp(-(xj-μ)^2/(2*σ^2)))
+	return log(p(xj))
 end
 end
 
@@ -77,13 +78,13 @@ end
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
 function svgd(nop,noi)
-	ϵ=1
-	x=LinRange(-5,-4,nop)
+	ϵ=stepsize
+	x=LinRange(-5,-4.8,nop)
 	x_n=zeros(nop)
 	iterations=zeros(noi,nop)
 	for i in 1:noi
 		for j in 1:nop
-			x_n[j]=x[j]+ϵ*ϕ(x[j],x) #variable step sizes	
+			x_n[j]=x[j]+ϵ*ϕ(x[j],x)	
 		end
 		x=copy(x_n)
 		iterations[i,:]=copy(x_n)
@@ -111,11 +112,11 @@ anim1=@animate for i in 1:ni
 	b_range = range(-5, 5, length=trunc(Int,np/3))
 	histogram(s[i,:],label="particles",bins=b_range,normalize=:pdf)
 	ylims!(0,0.25)
-	plot!(p,label="p(x)",lw=3)
+	plot!(p,label="p(x)",color="red",lw=3)
 end
 anim2=@animate for i in 1:ni
-	plot(p,label="p(x)",lw=3)
-	scatter!(s[i,:],ps[i,:],label="particles")
+	plot(p,label="p(x)",color="red",lw=3)
+	scatter!(s[i,:],ps[i,:],color="blue",label="particles")
 	xlims!(-5,5)
 end
 end
@@ -1830,6 +1831,7 @@ version = "1.4.1+1"
 # ╠═a8577720-7990-11ee-3a5e-eb35a337d22d
 # ╠═ac557ab9-97a8-42d8-ba5d-5a5551f68985
 # ╠═4acab3cb-1c55-4663-afb0-f1d2003533b6
+# ╠═bbbdc869-4635-4049-b43b-59b23f410fb1
 # ╠═acb67c33-0b23-459e-aa82-a84687a15de2
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
 # ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
