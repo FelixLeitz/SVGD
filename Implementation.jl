@@ -4,14 +4,40 @@
 using Markdown
 using InteractiveUtils
 
+# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
+macro bind(def, element)
+    quote
+        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
+        local el = $(esc(element))
+        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
+        el
+    end
+end
+
 # ╔═╡ a8577720-7990-11ee-3a5e-eb35a337d22d
 begin
 	using Plots
+	using PlutoUI
 	using LinearAlgebra
 	using DistributionsAD
 	using Todo
 	using ForwardDiff
 	using Flux
+end
+
+# ╔═╡ ac557ab9-97a8-42d8-ba5d-5a5551f68985
+@bind np Slider(1:100,show_value=true)
+
+# ╔═╡ 4acab3cb-1c55-4663-afb0-f1d2003533b6
+@bind ni Slider(1:100,show_value=true)
+
+# ╔═╡ acb67c33-0b23-459e-aa82-a84687a15de2
+begin
+function p(xj)
+	σ=2
+	μ=0
+	return 1/(σ*sqrt(2*pi))*exp(-(xj-μ)^2/(2*σ^2))
+end
 end
 
 # ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
@@ -42,7 +68,7 @@ begin
 function ϕ(xi,x)
 	sum=0
 	for xj in x
-		sum+=k(xj,xi)*gradlogp(xj)+gradk(xj,xi) #implement gradients
+		sum+=k(xj,xi)*gradlogp(xj)+gradk(xj,xi)
 	end
 	return 1/length(x)*sum
 end
@@ -52,26 +78,53 @@ end
 begin
 function svgd(nop,noi)
 	ϵ=1
-	x=LinRange(0,1,nop)
+	x=LinRange(-5,-4,nop)
 	x_n=zeros(nop)
+	iterations=zeros(noi,nop)
 	for i in 1:noi
 		for j in 1:nop
 			x_n[j]=x[j]+ϵ*ϕ(x[j],x) #variable step sizes	
 		end
 		x=copy(x_n)
+		iterations[i,:]=copy(x_n)
 	end
-	return x
+	return iterations
 end
 end
 
 # ╔═╡ a3c963b0-5748-4f4d-886f-7854dac730aa
-s=svgd(300,100)
+s=svgd(np,ni)
 
-# ╔═╡ b1aba176-b508-4546-936a-822257c9a351
+# ╔═╡ e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
 begin
-	b_range = range(-5,5, length=20)
-	histogram(s,bins=b_range)
+	ps=zeros(ni,np)
+	for i in 1:ni
+		for j in 1:np
+			ps[i,j]=p(s[i,j])
+		end
+	end
 end
+
+# ╔═╡ 954e8f0e-4e3c-4c0e-863e-cc6a65480af3
+begin
+anim1=@animate for i in 1:ni
+	b_range = range(-5, 5, length=trunc(Int,np/3))
+	histogram(s[i,:],label="particles",bins=b_range,normalize=:pdf)
+	ylims!(0,0.25)
+	plot!(p,label="p(x)",lw=3)
+end
+anim2=@animate for i in 1:ni
+	plot(p,label="p(x)",lw=3)
+	scatter!(s[i,:],ps[i,:],label="particles")
+	xlims!(-5,5)
+end
+end
+
+# ╔═╡ c504c30e-2b2b-4ef0-83bd-2fbd22287841
+gif(anim1,fps=20)
+
+# ╔═╡ 08449568-151f-42ee-b1aa-a96b26db44ae
+gif(anim2,fps=20)
 
 # ╔═╡ 20393384-a5dc-4271-91d5-c1a8e3bf4126
 begin
@@ -87,13 +140,16 @@ end
 todo"approximated probability density"
 
 # ╔═╡ aa58f5df-c0c3-4a08-be80-bcee66c48203
-todo"gradients"
+todo"generalize to R^d"
 
 # ╔═╡ 4350c420-3dd7-45de-91b1-35de7404198e
 todo"variable step size"
 
 # ╔═╡ 3b338210-1012-4601-a4d8-c45c08b2d483
-todo"visualization"
+todo"more appealing visualization (in more dims)"
+
+# ╔═╡ 5313b36d-b06b-427e-82f1-50376978134c
+todo"add neural network architecture"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -103,6 +159,7 @@ Flux = "587475ba-b771-5e3f-ad9e-33799f191a9c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
+PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Todo = "b28a226c-6cff-11e9-1336-699fd753ab00"
 
 [compat]
@@ -110,6 +167,7 @@ DistributionsAD = "~0.6.53"
 Flux = "~0.14.6"
 ForwardDiff = "~0.10.36"
 Plots = "~1.39.0"
+PlutoUI = "~0.7.52"
 Todo = "~0.1.0"
 """
 
@@ -119,7 +177,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "1cab807a8ec1ccb22b048fa8fc093b5c334502a3"
+project_hash = "71c7409fe1d3744a326885509679a484b0552320"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -131,6 +189,12 @@ weakdeps = ["ChainRulesCore", "Test"]
     [deps.AbstractFFTs.extensions]
     AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
     AbstractFFTsTestExt = "Test"
+
+[[deps.AbstractPlutoDingetjes]]
+deps = ["Pkg"]
+git-tree-sha1 = "91bd53c39b9cbfb5ef4b015e8b582d344532bd0a"
+uuid = "6e696c72-6542-2067-7265-42206c756150"
+version = "1.2.0"
 
 [[deps.Adapt]]
 deps = ["LinearAlgebra", "Requires"]
@@ -620,6 +684,24 @@ git-tree-sha1 = "f218fe3736ddf977e0e772bc9a586b2383da2685"
 uuid = "34004b35-14d8-5ef3-9330-4cdb6864b03a"
 version = "0.3.23"
 
+[[deps.Hyperscript]]
+deps = ["Test"]
+git-tree-sha1 = "8d511d5b81240fc8e6802386302675bdf47737b9"
+uuid = "47d2ed2b-36de-50cf-bf87-49c2cf4b8b91"
+version = "0.0.4"
+
+[[deps.HypertextLiteral]]
+deps = ["Tricks"]
+git-tree-sha1 = "c47c5fa4c5308f27ccaac35504858d8914e102f9"
+uuid = "ac1192a8-f4b3-4bfe-ba22-af5b92cd3ab2"
+version = "0.9.4"
+
+[[deps.IOCapture]]
+deps = ["Logging", "Random"]
+git-tree-sha1 = "d75853a0bdbfb1ac815478bacd89cd27b550ace6"
+uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
+version = "0.2.3"
+
 [[deps.IRTools]]
 deps = ["InteractiveUtils", "MacroTools", "Test"]
 git-tree-sha1 = "8aa91235360659ca7560db43a7d57541120aa31d"
@@ -851,6 +933,11 @@ git-tree-sha1 = "c1dd6d7978c12545b4179fb6153b9250c96b0075"
 uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
 version = "1.0.3"
 
+[[deps.MIMEs]]
+git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
+uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
+version = "0.1.4"
+
 [[deps.MLStyle]]
 git-tree-sha1 = "bc38dff0548128765760c79eb7388a4b37fae2c8"
 uuid = "d8e11817-5142-5d16-987a-aa16d5891078"
@@ -1062,6 +1149,12 @@ version = "1.39.0"
     IJulia = "7073ff75-c697-5162-941a-fcdaad2a7d2a"
     ImageInTerminal = "d8c32880-2388-543b-8c61-d9f865259254"
     Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[[deps.PlutoUI]]
+deps = ["AbstractPlutoDingetjes", "Base64", "ColorTypes", "Dates", "FixedPointNumbers", "Hyperscript", "HypertextLiteral", "IOCapture", "InteractiveUtils", "JSON", "Logging", "MIMEs", "Markdown", "Random", "Reexport", "URIs", "UUIDs"]
+git-tree-sha1 = "e47cd150dbe0443c3a3651bc5b9cbd5576ab75b7"
+uuid = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+version = "0.7.52"
 
 [[deps.PrecompileTools]]
 deps = ["Preferences"]
@@ -1360,6 +1453,11 @@ version = "0.4.78"
     LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
     OnlineStatsBase = "925886fa-5bf2-5e8e-b522-a9147a512338"
     Referenceables = "42d2dcc6-99eb-4e98-b66c-637b7d73030e"
+
+[[deps.Tricks]]
+git-tree-sha1 = "eae1bb484cd63b36999ee58be2de6c178105112f"
+uuid = "410a4b4d-49e4-4fbc-ab6d-cb71b17b3775"
+version = "0.1.8"
 
 [[deps.URIs]]
 git-tree-sha1 = "67db6cc7b3821e19ebe75791a9dd19c9b1188f2b"
@@ -1730,6 +1828,9 @@ version = "1.4.1+1"
 
 # ╔═╡ Cell order:
 # ╠═a8577720-7990-11ee-3a5e-eb35a337d22d
+# ╠═ac557ab9-97a8-42d8-ba5d-5a5551f68985
+# ╠═4acab3cb-1c55-4663-afb0-f1d2003533b6
+# ╠═acb67c33-0b23-459e-aa82-a84687a15de2
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
 # ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
 # ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
@@ -1737,11 +1838,15 @@ version = "1.4.1+1"
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
 # ╠═a3c963b0-5748-4f4d-886f-7854dac730aa
-# ╠═b1aba176-b508-4546-936a-822257c9a351
+# ╠═e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
+# ╠═954e8f0e-4e3c-4c0e-863e-cc6a65480af3
+# ╠═c504c30e-2b2b-4ef0-83bd-2fbd22287841
+# ╠═08449568-151f-42ee-b1aa-a96b26db44ae
 # ╠═20393384-a5dc-4271-91d5-c1a8e3bf4126
 # ╠═43311ef3-3c26-4331-bb75-a15993007e51
 # ╠═aa58f5df-c0c3-4a08-be80-bcee66c48203
 # ╠═4350c420-3dd7-45de-91b1-35de7404198e
 # ╠═3b338210-1012-4601-a4d8-c45c08b2d483
+# ╠═5313b36d-b06b-427e-82f1-50376978134c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
