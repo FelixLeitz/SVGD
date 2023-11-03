@@ -16,27 +16,33 @@ end
 
 # ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
 begin
-function p(xj)
-	σ=1
-	μ=1
-	return 1/(σ*sqrt(2*pi))*exp(-(xj-μ)^2/(2*σ^2))
+function logp(xj)
+	σ=2
+	μ=0
+	return log(1/(σ*sqrt(2*pi))*exp(-(xj-μ)^2/(2*σ^2)))
 end
 end
+
+# ╔═╡ 597721db-82fe-40b0-bd79-695f7d1f1a27
+gradlogp= x -> ForwardDiff.derivative(logp,x)
 
 # ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
 begin
 function k(x1,x2)
-	σ=1
-	return exp(-norm(x1-x2)^2/(2*σ^2))
+	h=1.0
+	return exp(-norm(x1-x2)^2/h)
 end
 end
+
+# ╔═╡ 3f5cbd17-2c3b-4149-8422-bfb6845177a0
+gradk(x1,x2)= ForwardDiff.derivative(x1->k(x1,x2),x1)
 
 # ╔═╡ f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 begin
 function ϕ(xi,x)
 	sum=0
 	for xj in x
-		sum+=k(xj,xi)*log(p(xj))+k(xj,xi) #insert gradients
+		sum+=k(xj,xi)*gradlogp(xj)+gradk(xj,xi) #implement gradients
 	end
 	return 1/length(x)*sum
 end
@@ -54,18 +60,24 @@ function svgd(nop,noi)
 		end
 		x=copy(x_n)
 	end
-	return x_n
+	return x
 end
 end
 
 # ╔═╡ a3c963b0-5748-4f4d-886f-7854dac730aa
-svgd(10,8)
+s=svgd(300,100)
+
+# ╔═╡ b1aba176-b508-4546-936a-822257c9a351
+begin
+	b_range = range(-5,5, length=20)
+	histogram(s,bins=b_range)
+end
 
 # ╔═╡ 20393384-a5dc-4271-91d5-c1a8e3bf4126
 begin
 function NeuralNetwork()
 	return Chain(
-				Dense(2,20,relu)
+				Dense(2,20,relu),
 				Dense(20,1,relu)
 				)
 end
@@ -1719,10 +1731,13 @@ version = "1.4.1+1"
 # ╔═╡ Cell order:
 # ╠═a8577720-7990-11ee-3a5e-eb35a337d22d
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
+# ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
 # ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
+# ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
 # ╠═a3c963b0-5748-4f4d-886f-7854dac730aa
+# ╠═b1aba176-b508-4546-936a-822257c9a351
 # ╠═20393384-a5dc-4271-91d5-c1a8e3bf4126
 # ╠═43311ef3-3c26-4331-bb75-a15993007e51
 # ╠═aa58f5df-c0c3-4a08-be80-bcee66c48203
