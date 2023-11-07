@@ -25,14 +25,23 @@ begin
 	using Flux
 end
 
+# ╔═╡ 75503983-557f-4926-9f2e-478d381bf731
+md"""# SVGD 
+This is a short implementation of basic **SVGD** principles for a toy example.
+"""
+
 # ╔═╡ ac557ab9-97a8-42d8-ba5d-5a5551f68985
-@bind np Slider(1:100,default=20,show_value=true)
+@bind np Slider(1:100,default=50,show_value=true)
 
 # ╔═╡ 4acab3cb-1c55-4663-afb0-f1d2003533b6
-@bind ni Slider(1:100,show_value=true)
+@bind ni Slider(1:100,default=100,show_value=true)
 
 # ╔═╡ bbbdc869-4635-4049-b43b-59b23f410fb1
 @bind stepsize Slider(0.01:0.01:1,default=1,show_value=true)
+
+# ╔═╡ 2d45645a-2798-42fa-9399-a110cd890e70
+md"""## Functions
+First of all the different functions which will be used need to be defined."""
 
 # ╔═╡ acb67c33-0b23-459e-aa82-a84687a15de2
 begin
@@ -46,12 +55,16 @@ end
 # ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
 begin
 function logp(xj)
-	return log(p(xj))
+	func=log(p(xj))
+	return func
 end
 end
 
 # ╔═╡ 597721db-82fe-40b0-bd79-695f7d1f1a27
-gradlogp= x -> ForwardDiff.derivative(logp,x)
+begin
+gradlogp(x::T) where{T<:Real} = ForwardDiff.derivative(x->logp(x),x)
+gradlogp(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->logp(x),x)
+end
 
 # ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
 begin
@@ -62,18 +75,25 @@ end
 end
 
 # ╔═╡ 3f5cbd17-2c3b-4149-8422-bfb6845177a0
-gradk(x1,x2)= ForwardDiff.derivative(x1->k(x1,x2),x1)
+begin
+gradk(x1::T,x2) where {T<:Real}= ForwardDiff.derivative(x1->k(x1,x2),x1)
+gradk(x1::AbstractArray{T},x2) where {T<:Real} = ForwardDiff.gradient(x1->k(x1,x2),x1)
+end
 
 # ╔═╡ f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 begin
 function ϕ(xi,x)
-	sum=0
+	sum=0.0
 	for xj in x
 		sum+=k(xj,xi)*gradlogp(xj)+gradk(xj,xi)
 	end
 	return 1/length(x)*sum
 end
 end
+
+# ╔═╡ 273f06ed-4ea0-499a-9cbc-9728ff5a6d38
+md"""### SVGD
+Iterative method for approximation proposed in (Liu, Wang 2016)."""
 
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
@@ -93,39 +113,80 @@ function svgd(nop,noi)
 end
 end
 
+# ╔═╡ 4e46728f-73b0-4445-9894-781831a3875d
+md"""### Visualization"""
+
 # ╔═╡ a3c963b0-5748-4f4d-886f-7854dac730aa
-s=svgd(np,ni)
+s=svgd(np,ni);
+
+# ╔═╡ e48dd1d9-8bb0-4edf-982d-95e2338cc7f6
+md"""Creation of different datasets, dv accounts for the slope of the first animation weighted by the number of particles."""
 
 # ╔═╡ e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
 begin
 	ps=zeros(ni,np)
+	dv=zeros(ni,np-1)
+	errors=zeros(ni,np-1)
+	error=zeros(ni)
 	for i in 1:ni
 		for j in 1:np
 			ps[i,j]=p(s[i,j])
 		end
+		sum=0.0
+		for k in 1:(np-1)
+			dv[i,k]=1/((s[i,k+1]-s[i,k])*np)
+			errors[i,k]=ps[i,k]-dv[i,k]
+		end
+		error[i]=norm(errors[i,:])
 	end
 end
 
-# ╔═╡ 954e8f0e-4e3c-4c0e-863e-cc6a65480af3
-begin
+# ╔═╡ 0d7fb7da-8fbe-4089-835f-bd566be80408
 anim1=@animate for i in 1:ni
+	scatter(s[i,:],label="particle position",color="blue",lw=3)
+	ylims!(-5,5)
+end;
+
+# ╔═╡ b5fd1e9b-6ea7-4684-9c1d-7f1c14632f9c
+gif(anim1,fps=20)
+
+# ╔═╡ e59f12f6-a80f-4194-92d2-51f11c2b3942
+anim2=@animate for i in 1:ni
 	b_range = range(-5, 5, length=trunc(Int,np/3))
 	histogram(s[i,:],label="particles",bins=b_range,normalize=:pdf)
 	ylims!(0,0.25)
 	plot!(p,label="p(x)",color="red",lw=3)
-end
-anim2=@animate for i in 1:ni
-	plot(p,label="p(x)",color="red",lw=3)
-	scatter!(s[i,:],ps[i,:],color="blue",label="particles")
-	xlims!(-5,5)
-end
-end
+end;
 
 # ╔═╡ c504c30e-2b2b-4ef0-83bd-2fbd22287841
-gif(anim1,fps=20)
+gif(anim2,fps=20)
+
+# ╔═╡ 471b4f55-7648-4dd2-bf97-dca97bdf0a05
+anim3=@animate for i in 1:ni
+	plot(p,label="p(x)",color="red",lw=3);
+	scatter!(s[i,:],ps[i,:],color="blue",label="particles");
+	xlims!(-5,5);
+end;
 
 # ╔═╡ 08449568-151f-42ee-b1aa-a96b26db44ae
-gif(anim2,fps=20)
+gif(anim3,fps=20)
+
+# ╔═╡ 9ca73ff9-bde7-476c-98e7-c0ee1ee14fe8
+anim4=@animate for i in 1:ni
+	plot(s[i,1:np-1],dv[i,:],label="approximation",color="red",lw=3)
+	plot!(range(-5,5,200),p,label="p(x)",color="blue",lw=3)
+	xlims!(-5,5)
+	ylims!(0,0.25)
+end;
+
+# ╔═╡ 7a9e69be-08d8-44da-8fb5-9fe1a0a3db06
+gif(anim4,fps=20)
+
+# ╔═╡ 5c84104f-6d9c-4e4e-95c4-42d24dd4a4af
+begin
+	plot(error,label="discrepancy",color="blue",lw=3)
+	ylims!(0,1)
+end
 
 # ╔═╡ 20393384-a5dc-4271-91d5-c1a8e3bf4126
 begin
@@ -1828,23 +1889,34 @@ version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
+# ╟─75503983-557f-4926-9f2e-478d381bf731
 # ╠═a8577720-7990-11ee-3a5e-eb35a337d22d
 # ╠═ac557ab9-97a8-42d8-ba5d-5a5551f68985
 # ╠═4acab3cb-1c55-4663-afb0-f1d2003533b6
 # ╠═bbbdc869-4635-4049-b43b-59b23f410fb1
+# ╟─2d45645a-2798-42fa-9399-a110cd890e70
 # ╠═acb67c33-0b23-459e-aa82-a84687a15de2
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
 # ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
 # ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
 # ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
+# ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
+# ╠═4e46728f-73b0-4445-9894-781831a3875d
 # ╠═a3c963b0-5748-4f4d-886f-7854dac730aa
+# ╟─e48dd1d9-8bb0-4edf-982d-95e2338cc7f6
 # ╠═e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
-# ╠═954e8f0e-4e3c-4c0e-863e-cc6a65480af3
-# ╠═c504c30e-2b2b-4ef0-83bd-2fbd22287841
-# ╠═08449568-151f-42ee-b1aa-a96b26db44ae
-# ╠═20393384-a5dc-4271-91d5-c1a8e3bf4126
+# ╟─0d7fb7da-8fbe-4089-835f-bd566be80408
+# ╟─b5fd1e9b-6ea7-4684-9c1d-7f1c14632f9c
+# ╟─e59f12f6-a80f-4194-92d2-51f11c2b3942
+# ╟─c504c30e-2b2b-4ef0-83bd-2fbd22287841
+# ╟─471b4f55-7648-4dd2-bf97-dca97bdf0a05
+# ╟─08449568-151f-42ee-b1aa-a96b26db44ae
+# ╟─9ca73ff9-bde7-476c-98e7-c0ee1ee14fe8
+# ╟─7a9e69be-08d8-44da-8fb5-9fe1a0a3db06
+# ╟─5c84104f-6d9c-4e4e-95c4-42d24dd4a4af
+# ╟─20393384-a5dc-4271-91d5-c1a8e3bf4126
 # ╠═43311ef3-3c26-4331-bb75-a15993007e51
 # ╠═aa58f5df-c0c3-4a08-be80-bcee66c48203
 # ╠═4350c420-3dd7-45de-91b1-35de7404198e
