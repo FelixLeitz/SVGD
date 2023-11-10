@@ -116,6 +116,78 @@ end
 # ╔═╡ 4e46728f-73b0-4445-9894-781831a3875d
 md"""### Visualization"""
 
+# ╔═╡ a3c963b0-5748-4f4d-886f-7854dac730aa
+s=svgd(np,ni);
+
+# ╔═╡ e48dd1d9-8bb0-4edf-982d-95e2338cc7f6
+md"""Creation of different datasets, dv accounts for the slope of the first animation weighted by the number of particles."""
+
+# ╔═╡ e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
+begin
+	ps=zeros(ni,np)
+	dv=zeros(ni,np-1)
+	errors=zeros(ni,np-1)
+	error=zeros(ni)
+	for i in 1:ni
+		for j in 1:np
+			ps[i,j]=p(s[i,j])
+		end
+		sum=0.0
+		for k in 1:(np-1)
+			dv[i,k]=1/((s[i,k+1]-s[i,k])*np)
+			errors[i,k]=ps[i,k]-dv[i,k]
+		end
+		error[i]=norm(errors[i,:])
+	end
+end
+
+# ╔═╡ 0d7fb7da-8fbe-4089-835f-bd566be80408
+anim1=@animate for i in 1:ni
+	scatter(s[i,:],label="particle position",color="blue",lw=3)
+	ylims!(-5,5)
+end;
+
+# ╔═╡ b5fd1e9b-6ea7-4684-9c1d-7f1c14632f9c
+gif(anim1,fps=20)
+
+# ╔═╡ e59f12f6-a80f-4194-92d2-51f11c2b3942
+anim2=@animate for i in 1:ni
+	b_range = range(-5, 5, length=trunc(Int,np/3))
+	histogram(s[i,:],label="particles",bins=b_range,normalize=:pdf)
+	ylims!(0,0.25)
+	plot!(p,label="p(x)",color="red",lw=3)
+end;
+
+# ╔═╡ c504c30e-2b2b-4ef0-83bd-2fbd22287841
+gif(anim2,fps=20)
+
+# ╔═╡ 471b4f55-7648-4dd2-bf97-dca97bdf0a05
+anim3=@animate for i in 1:ni
+	plot(p,label="p(x)",color="red",lw=3);
+	scatter!(s[i,:],ps[i,:],color="blue",label="particles");
+	xlims!(-5,5);
+end;
+
+# ╔═╡ 08449568-151f-42ee-b1aa-a96b26db44ae
+gif(anim3,fps=20)
+
+# ╔═╡ 9ca73ff9-bde7-476c-98e7-c0ee1ee14fe8
+anim4=@animate for i in 1:ni
+	plot(s[i,1:np-1],dv[i,:],label="approximation",color="red",lw=3)
+	plot!(range(-5,5,200),p,label="p(x)",color="blue",lw=3)
+	xlims!(-5,5)
+	ylims!(0,0.25)
+end;
+
+# ╔═╡ 7a9e69be-08d8-44da-8fb5-9fe1a0a3db06
+gif(anim4,fps=20)
+
+# ╔═╡ 5c84104f-6d9c-4e4e-95c4-42d24dd4a4af
+begin
+	plot(error,label="discrepancy",color="blue",lw=3)
+	ylims!(0,1)
+end
+
 # ╔═╡ 20393384-a5dc-4271-91d5-c1a8e3bf4126
 begin
 function NeuralNetwork()
@@ -125,6 +197,21 @@ function NeuralNetwork()
 				)
 end
 end
+
+# ╔═╡ 43311ef3-3c26-4331-bb75-a15993007e51
+todo"approximated probability density"
+
+# ╔═╡ aa58f5df-c0c3-4a08-be80-bcee66c48203
+todo"generalize to R^d"
+
+# ╔═╡ 4350c420-3dd7-45de-91b1-35de7404198e
+todo"variable step size"
+
+# ╔═╡ 3b338210-1012-4601-a4d8-c45c08b2d483
+todo"more appealing visualization (in more dims)"
+
+# ╔═╡ 5313b36d-b06b-427e-82f1-50376978134c
+todo"add neural network architecture"
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1816,7 +1903,24 @@ version = "1.4.1+1"
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 # ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
-# ╟─4e46728f-73b0-4445-9894-781831a3875d
+# ╠═4e46728f-73b0-4445-9894-781831a3875d
+# ╠═a3c963b0-5748-4f4d-886f-7854dac730aa
+# ╟─e48dd1d9-8bb0-4edf-982d-95e2338cc7f6
+# ╠═e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
+# ╟─0d7fb7da-8fbe-4089-835f-bd566be80408
+# ╟─b5fd1e9b-6ea7-4684-9c1d-7f1c14632f9c
+# ╟─e59f12f6-a80f-4194-92d2-51f11c2b3942
+# ╟─c504c30e-2b2b-4ef0-83bd-2fbd22287841
+# ╟─471b4f55-7648-4dd2-bf97-dca97bdf0a05
+# ╟─08449568-151f-42ee-b1aa-a96b26db44ae
+# ╟─9ca73ff9-bde7-476c-98e7-c0ee1ee14fe8
+# ╟─7a9e69be-08d8-44da-8fb5-9fe1a0a3db06
+# ╟─5c84104f-6d9c-4e4e-95c4-42d24dd4a4af
 # ╟─20393384-a5dc-4271-91d5-c1a8e3bf4126
+# ╠═43311ef3-3c26-4331-bb75-a15993007e51
+# ╠═aa58f5df-c0c3-4a08-be80-bcee66c48203
+# ╠═4350c420-3dd7-45de-91b1-35de7404198e
+# ╠═3b338210-1012-4601-a4d8-c45c08b2d483
+# ╠═5313b36d-b06b-427e-82f1-50376978134c
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
