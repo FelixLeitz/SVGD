@@ -147,6 +147,9 @@ anim1=@animate for i in 1:ni
 	ylims!(-5,5)
 end;
 
+# ╔═╡ 5936ee91-e029-4ff1-830e-e8ccfba688b1
+s[1,:]
+
 # ╔═╡ b5fd1e9b-6ea7-4684-9c1d-7f1c14632f9c
 gif(anim1,fps=20)
 
@@ -1907,13 +1910,14 @@ version = "1.4.1+1"
 # ╠═a3c963b0-5748-4f4d-886f-7854dac730aa
 # ╟─e48dd1d9-8bb0-4edf-982d-95e2338cc7f6
 # ╠═e2b99e87-aeb4-4c83-9910-fb70d52e8e4c
-# ╟─0d7fb7da-8fbe-4089-835f-bd566be80408
+# ╠═0d7fb7da-8fbe-4089-835f-bd566be80408
+# ╠═5936ee91-e029-4ff1-830e-e8ccfba688b1
 # ╟─b5fd1e9b-6ea7-4684-9c1d-7f1c14632f9c
-# ╟─e59f12f6-a80f-4194-92d2-51f11c2b3942
+# ╠═e59f12f6-a80f-4194-92d2-51f11c2b3942
 # ╟─c504c30e-2b2b-4ef0-83bd-2fbd22287841
-# ╟─471b4f55-7648-4dd2-bf97-dca97bdf0a05
+# ╠═471b4f55-7648-4dd2-bf97-dca97bdf0a05
 # ╟─08449568-151f-42ee-b1aa-a96b26db44ae
-# ╟─9ca73ff9-bde7-476c-98e7-c0ee1ee14fe8
+# ╠═9ca73ff9-bde7-476c-98e7-c0ee1ee14fe8
 # ╟─7a9e69be-08d8-44da-8fb5-9fe1a0a3db06
 # ╟─5c84104f-6d9c-4e4e-95c4-42d24dd4a4af
 # ╟─20393384-a5dc-4271-91d5-c1a8e3bf4126

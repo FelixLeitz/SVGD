@@ -30,13 +30,13 @@ md"""# SVGD
 This is a short implementation of basic **SVGD** principles for a toy example.
 """
 
-# ╔═╡ ac557ab9-97a8-42d8-ba5d-5a5551f68985
-@bind np Slider(1:100,default=50,show_value=true)
+# ╔═╡ e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
+np=5
 
-# ╔═╡ 4acab3cb-1c55-4663-afb0-f1d2003533b6
-@bind ni Slider(1:100,default=100,show_value=true)
+# ╔═╡ 408009b6-3f3c-4cb9-a4d0-8ef4da948b84
+@bind ni Slider(1:400,default=100,show_value=true)
 
-# ╔═╡ bbbdc869-4635-4049-b43b-59b23f410fb1
+# ╔═╡ 44c16b2d-5e33-4f99-972e-0506065fca63
 @bind stepsize Slider(0.01:0.01:1,default=1,show_value=true)
 
 # ╔═╡ 2d45645a-2798-42fa-9399-a110cd890e70
@@ -46,17 +46,18 @@ First of all the different functions which will be used need to be defined."""
 # ╔═╡ acb67c33-0b23-459e-aa82-a84687a15de2
 begin
 function p(xj)
+	n=2
 	σ=2
-	μ=0
-	return 1/(σ*sqrt(2*pi))*exp(-(xj-μ)^2/(2*σ^2))
+	μ=zeros(n,1)
+	return 1/(σ*sqrt((2*pi)^n))*exp(-norm(xj-μ)^2/(2*σ^2))
 end
 end
 
 # ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
 begin
 function logp(xj)
-	func=log(p(xj))
-	return func
+	f=log(p(xj))
+	return f
 end
 end
 
@@ -83,48 +84,95 @@ end
 # ╔═╡ f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 begin
 function ϕ(xi,x)
-	sum=0.0
-	for xj in x
-		sum+=k(xj,xi)*gradlogp(xj)+gradk(xj,xi)
+	n=2
+	sum=zeros(2,1)
+	for j in 1:np^2
+		sum+=k(x[j,:],xi)*gradlogp(x[j,:])+gradk(x[j,:],xi)
 	end
-	return 1/length(x)*sum
+	return 1/size(x,1)*sum
 end
 end
+
+# ╔═╡ 4c191bcd-a6fc-4df6-8cfa-2819d7e779b7
+begin
+	u = Iterators.product(-1.:0.01:0.0, -1.:0.01:0.0, -1.:0.01:0.0)
+	u=vec(collect(u))
+end
+
+# ╔═╡ 89cb4f11-16b4-4959-b2fa-000aae8725a0
+v=zeros(length(u),3);
+
+# ╔═╡ fa2f0c74-ce4e-4b1c-9e5d-824adefdfdc9
+for i in 1:length(u)
+	v[i,:]=[j for j in u[i]]
+end
+
+# ╔═╡ 465dd672-56e0-4ac1-a69e-de3fce24051a
+v
 
 # ╔═╡ 273f06ed-4ea0-499a-9cbc-9728ff5a6d38
 md"""### SVGD
 Iterative method for approximation proposed in (Liu, Wang 2016)."""
 
+# ╔═╡ a6219cca-c24a-40f5-9e17-749f115050a2
+function meshgrid(x, y)
+    aa = x' .* ones(length(x))
+    bb = ones(length(y))' .* y
+    return aa, bb
+end
+
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
-function svgd(nop,noi)
-	ϵ=stepsize
-	x=LinRange(-5,-4.8,nop)
-	x_n=zeros(nop)
-	iterations=zeros(noi,nop)
-	for i in 1:noi
-		for j in 1:nop
-			x_n[j]=x[j]+ϵ*ϕ(x[j],x)	
-		end
-		x=copy(x_n)
-		iterations[i,:]=copy(x_n)
-	end
-	return iterations
-end
-end
+ϵ=1
+x = LinRange(-2,-1,np)
+y = LinRange(-2,-1,np)	
+xx,yy = meshgrid(x,y)
+X = [[xx[i],yy[i]] for i in eachindex(xx)]
+XX=reduce(hcat,X)'
+XX_n=zeros(np^2,2)
+end;
 
-# ╔═╡ 4e46728f-73b0-4445-9894-781831a3875d
-md"""### Visualization"""
-
-# ╔═╡ 20393384-a5dc-4271-91d5-c1a8e3bf4126
+# ╔═╡ a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
 begin
-function NeuralNetwork()
-	return Chain(
-				Dense(2,20,relu),
-				Dense(20,1,relu)
-				)
+	Iterations=zeros(ni,np^2,2)
+end;
+
+# ╔═╡ 81d75374-db13-465d-9fd5-ca5efab645e2
+begin
+for j in 1:ni
+	for i in 1:np^2
+		XX_n[i,:]=XX[i,:]+ϵ*ϕ(XX[i,:],XX)
+	end	
+	XX=copy(XX_n)
+	Iterations[j,:,:]=copy(XX_n)
 end
 end
+
+# ╔═╡ 751e709e-1290-41d8-a208-ef117fc0d95b
+Z=zeros(np^2,ni);
+
+# ╔═╡ 406444d5-92f9-4ca6-b56c-a91dd7b45710
+begin
+	for i in 1:ni
+		for j in 1:np^2
+			Z[j,i]=p(Iterations[i,j,:])
+		end
+	end
+end
+
+# ╔═╡ f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
+animation=@animate for i in 1:ni
+	scatter(Iterations[i,:,1],Iterations[i,:,2],legend=false)
+	xlims!(-4,4)
+	ylims!(-4,4)
+	zlims!(0,0.1)
+end
+
+# ╔═╡ 46ef453d-6538-46bf-8522-3d61a2807701
+gif(animation,fps=40)
+
+# ╔═╡ 327bccc6-9f18-4bd4-b420-34fb89856149
+scatter(reshape(Iterations[ni,:,1],np,np),reshape(Iterations[ni,:,2],np,np),reshape(Z[:,ni],np,np),color="blue",legend=false)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -227,11 +275,6 @@ git-tree-sha1 = "aebf55e6d7795e02ca500a689d326ac979aaf89e"
 uuid = "9718e550-a3fa-408a-8086-8db961cd8217"
 version = "0.1.1"
 
-[[deps.BitFlags]]
-git-tree-sha1 = "43b1a4a8f797c1cddadf60499a8a077d4af2cd2d"
-uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
-version = "0.1.7"
-
 [[deps.Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "19a35467a82e236ff51bc17a3a44b69ef35185a2"
@@ -270,12 +313,6 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
-
-[[deps.CodecZlib]]
-deps = ["TranscodingStreams", "Zlib_jll"]
-git-tree-sha1 = "cd67fc487743b2f0fd4380d4cbd3a24660d0eec8"
-uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
-version = "0.7.3"
 
 [[deps.ColorSchemes]]
 deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "PrecompileTools", "Random"]
@@ -336,12 +373,6 @@ version = "0.1.2"
 
     [deps.CompositionsBase.weakdeps]
     InverseFunctions = "3587e190-3f89-42d0-90ee-14403ec27112"
-
-[[deps.ConcurrentUtilities]]
-deps = ["Serialization", "Sockets"]
-git-tree-sha1 = "5372dbbf8f0bdb8c700db5367132925c0771ef7e"
-uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
-version = "2.2.1"
 
 [[deps.ConstructionBase]]
 deps = ["LinearAlgebra"]
@@ -469,12 +500,6 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "8e9441ee83492030ace98f9789a654a6d0b1f643"
 uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
 version = "0.0.20230411+0"
-
-[[deps.ExceptionUnwrapping]]
-deps = ["Test"]
-git-tree-sha1 = "e90caa41f5a86296e014e148ee061bd6c3edec96"
-uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
-version = "0.1.9"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -642,10 +667,10 @@ uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
 
 [[deps.HTTP]]
-deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
-git-tree-sha1 = "5eab648309e2e060198b45820af1a37182de3cce"
+deps = ["Base64", "Dates", "IniFile", "Logging", "MbedTLS", "NetworkOptions", "Sockets", "URIs"]
+git-tree-sha1 = "0fa77022fe4b511826b39c894c90daf5fce3334a"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "1.10.0"
+version = "0.9.17"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -682,6 +707,11 @@ deps = ["InteractiveUtils", "MacroTools", "Test"]
 git-tree-sha1 = "8aa91235360659ca7560db43a7d57541120aa31d"
 uuid = "7869d1d1-7146-5819-86e3-90919afe41df"
 version = "0.4.11"
+
+[[deps.IniFile]]
+git-tree-sha1 = "f550e6e32074c939295eb5ea6de31849ac2c9625"
+uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
+version = "0.5.1"
 
 [[deps.InitialValues]]
 git-tree-sha1 = "4da0f88e9a39111c2fa3add390ab15f3a44f3ca3"
@@ -902,12 +932,6 @@ version = "0.3.26"
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
-[[deps.LoggingExtras]]
-deps = ["Dates", "Logging"]
-git-tree-sha1 = "c1dd6d7978c12545b4179fb6153b9250c96b0075"
-uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
-version = "1.0.3"
-
 [[deps.MIMEs]]
 git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
 uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
@@ -1024,12 +1048,6 @@ version = "0.3.21+4"
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 version = "0.8.1+0"
-
-[[deps.OpenSSL]]
-deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
-git-tree-sha1 = "51901a49222b09e3743c65b8847687ae5fc78eb2"
-uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
-version = "1.4.1"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1255,11 +1273,6 @@ git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
 uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
 version = "1.0.3"
 
-[[deps.SimpleBufferStream]]
-git-tree-sha1 = "874e8867b33a00e784c8a7e4b60afe9e037b74e1"
-uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
-version = "1.1.0"
-
 [[deps.SimpleTraits]]
 deps = ["InteractiveUtils", "MacroTools"]
 git-tree-sha1 = "5d7e3f4e11935503d3ecaf7186eac40602e7d231"
@@ -1399,15 +1412,6 @@ deps = ["Dates", "Test"]
 git-tree-sha1 = "f73f62d4b2ba21649d237722507f9b0ccc9d8b94"
 uuid = "b28a226c-6cff-11e9-1336-699fd753ab00"
 version = "0.1.0"
-
-[[deps.TranscodingStreams]]
-git-tree-sha1 = "49cbf7c74fafaed4c529d47d48c8f7da6a19eb75"
-uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
-version = "0.10.1"
-weakdeps = ["Random", "Test"]
-
-    [deps.TranscodingStreams.extensions]
-    TestExt = ["Test", "Random"]
 
 [[deps.Transducers]]
 deps = ["Adapt", "ArgCheck", "BangBang", "Baselet", "CompositionsBase", "ConstructionBase", "DefineSingletons", "Distributed", "InitialValues", "Logging", "Markdown", "MicroCollections", "Requires", "Setfield", "SplittablesBase", "Tables"]
@@ -1804,9 +1808,9 @@ version = "1.4.1+1"
 # ╔═╡ Cell order:
 # ╟─75503983-557f-4926-9f2e-478d381bf731
 # ╠═a8577720-7990-11ee-3a5e-eb35a337d22d
-# ╠═ac557ab9-97a8-42d8-ba5d-5a5551f68985
-# ╠═4acab3cb-1c55-4663-afb0-f1d2003533b6
-# ╠═bbbdc869-4635-4049-b43b-59b23f410fb1
+# ╠═e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
+# ╠═408009b6-3f3c-4cb9-a4d0-8ef4da948b84
+# ╠═44c16b2d-5e33-4f99-972e-0506065fca63
 # ╟─2d45645a-2798-42fa-9399-a110cd890e70
 # ╠═acb67c33-0b23-459e-aa82-a84687a15de2
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
@@ -1814,9 +1818,19 @@ version = "1.4.1+1"
 # ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
 # ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
+# ╠═4c191bcd-a6fc-4df6-8cfa-2819d7e779b7
+# ╠═89cb4f11-16b4-4959-b2fa-000aae8725a0
+# ╠═fa2f0c74-ce4e-4b1c-9e5d-824adefdfdc9
+# ╠═465dd672-56e0-4ac1-a69e-de3fce24051a
 # ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
+# ╠═a6219cca-c24a-40f5-9e17-749f115050a2
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
-# ╟─4e46728f-73b0-4445-9894-781831a3875d
-# ╟─20393384-a5dc-4271-91d5-c1a8e3bf4126
+# ╠═a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
+# ╠═81d75374-db13-465d-9fd5-ca5efab645e2
+# ╠═751e709e-1290-41d8-a208-ef117fc0d95b
+# ╠═406444d5-92f9-4ca6-b56c-a91dd7b45710
+# ╠═f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
+# ╠═46ef453d-6538-46bf-8522-3d61a2807701
+# ╠═327bccc6-9f18-4bd4-b420-34fb89856149
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
