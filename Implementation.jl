@@ -4,16 +4,6 @@
 using Markdown
 using InteractiveUtils
 
-# This Pluto notebook uses @bind for interactivity. When running this notebook outside of Pluto, the following 'mock version' of @bind gives bound variables a default value (instead of an error).
-macro bind(def, element)
-    quote
-        local iv = try Base.loaded_modules[Base.PkgId(Base.UUID("6e696c72-6542-2067-7265-42206c756150"), "AbstractPlutoDingetjes")].Bonds.initial_value catch; b -> missing; end
-        local el = $(esc(element))
-        global $(esc(def)) = Core.applicable(Base.get, el) ? Base.get(el) : iv(el)
-        el
-    end
-end
-
 # ╔═╡ a8577720-7990-11ee-3a5e-eb35a337d22d
 begin
 	using Plots
@@ -34,10 +24,10 @@ This is a short implementation of basic **SVGD** principles for a toy example.
 np=5
 
 # ╔═╡ 408009b6-3f3c-4cb9-a4d0-8ef4da948b84
-@bind ni Slider(1:400,default=100,show_value=true)
+ni=400
 
 # ╔═╡ 44c16b2d-5e33-4f99-972e-0506065fca63
-@bind stepsize Slider(0.01:0.01:1,default=1,show_value=true)
+stepsize=1
 
 # ╔═╡ 2d45645a-2798-42fa-9399-a110cd890e70
 md"""## Functions
@@ -67,6 +57,15 @@ gradlogp(x::T) where{T<:Real} = ForwardDiff.derivative(x->logp(x),x)
 gradlogp(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->logp(x),x)
 end
 
+# ╔═╡ 0ca64d1c-a648-4e79-ac77-1861604e73cb
+rosenbrock(x) = (1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2
+
+# ╔═╡ 95536a80-43dd-4fda-9e97-a1b71ccfea57
+logr(x) = log(rosenbrock(x))
+
+# ╔═╡ f2f14f9f-8bfd-4642-ac69-1db28298d8ab
+gradlogr = x -> ForwardDiff.gradient(logr,x)
+
 # ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
 begin
 function k(x1,x2)
@@ -93,26 +92,20 @@ function ϕ(xi,x)
 end
 end
 
-# ╔═╡ 4c191bcd-a6fc-4df6-8cfa-2819d7e779b7
-begin
-	u = Iterators.product(-1.:0.01:0.0, -1.:0.01:0.0, -1.:0.01:0.0)
-	u=vec(collect(u))
-end
-
-# ╔═╡ 89cb4f11-16b4-4959-b2fa-000aae8725a0
-v=zeros(length(u),3);
-
-# ╔═╡ fa2f0c74-ce4e-4b1c-9e5d-824adefdfdc9
-for i in 1:length(u)
-	v[i,:]=[j for j in u[i]]
-end
-
-# ╔═╡ 465dd672-56e0-4ac1-a69e-de3fce24051a
-v
-
 # ╔═╡ 273f06ed-4ea0-499a-9cbc-9728ff5a6d38
 md"""### SVGD
 Iterative method for approximation proposed in (Liu, Wang 2016)."""
+
+# ╔═╡ c6a5665e-2b18-49e9-93eb-c44a8afff73b
+function grid(n)
+	tuples = Iterators.product(-1.:0.01:0.0, -1.:0.01:0.0, -1.:0.01:0.0)
+	tuples = vec(collect(tuples))
+	grid=zeros(length(tuples),n);
+	for i in 1:length(tuples)
+		grid[i,:]=[j for j in tuples[i]]
+	end
+	return grid
+end
 
 # ╔═╡ a6219cca-c24a-40f5-9e17-749f115050a2
 function meshgrid(x, y)
@@ -123,13 +116,13 @@ end
 
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
-ϵ=1
+ϵ= stepsize
 x = LinRange(-2,-1,np)
 y = LinRange(-2,-1,np)	
 xx,yy = meshgrid(x,y)
 X = [[xx[i],yy[i]] for i in eachindex(xx)]
-XX=reduce(hcat,X)'
-XX_n=zeros(np^2,2)
+particles=reduce(hcat,X)'
+temp=zeros(np^2,2)
 end;
 
 # ╔═╡ a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
@@ -141,28 +134,34 @@ end;
 begin
 for j in 1:ni
 	for i in 1:np^2
-		XX_n[i,:]=XX[i,:]+ϵ*ϕ(XX[i,:],XX)
+		temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles)
 	end	
-	XX=copy(XX_n)
-	Iterations[j,:,:]=copy(XX_n)
+	particles=copy(temp)
+	Iterations[j,:,:]=copy(temp)
 end
 end
 
-# ╔═╡ 751e709e-1290-41d8-a208-ef117fc0d95b
-Z=zeros(np^2,ni);
+# ╔═╡ bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
+md"""from https://docs.juliaplots.org/latest/gallery/gr/generated/gr-ref022/#gr_ref022"""
 
-# ╔═╡ 406444d5-92f9-4ca6-b56c-a91dd7b45710
+# ╔═╡ fccf6474-aab9-471b-bf69-73ac24d306d6
 begin
-	for i in 1:ni
-		for j in 1:np^2
-			Z[j,i]=p(Iterations[i,j,:])
-		end
-	end
-end
+a = -4:0.1:4
+b = -4:0.1:4
+f(x, y) = begin
+        p([x,y])
+    end
+x_grid = repeat(reshape(a, 1, :), length(b), 1)
+y_grid = repeat(b, 1, length(a))
+mapping_p = map(f, x_grid, y_grid)
+cont1 = contour(a, b, f, fill = true)
+cont2 = contour(a, b, mapping_p)
+end;
 
 # ╔═╡ f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
 animation=@animate for i in 1:ni
-	scatter(Iterations[i,:,1],Iterations[i,:,2],legend=false)
+	plot(cont2)
+	scatter!(Iterations[i,:,1],Iterations[i,:,2],legend=false,color="black")
 	xlims!(-4,4)
 	ylims!(-4,4)
 	zlims!(0,0.1)
@@ -170,9 +169,6 @@ end
 
 # ╔═╡ 46ef453d-6538-46bf-8522-3d61a2807701
 gif(animation,fps=40)
-
-# ╔═╡ 327bccc6-9f18-4bd4-b420-34fb89856149
-scatter(reshape(Iterations[ni,:,1],np,np),reshape(Iterations[ni,:,2],np,np),reshape(Z[:,ni],np,np),color="blue",legend=false)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1815,22 +1811,21 @@ version = "1.4.1+1"
 # ╠═acb67c33-0b23-459e-aa82-a84687a15de2
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
 # ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
+# ╠═0ca64d1c-a648-4e79-ac77-1861604e73cb
+# ╠═95536a80-43dd-4fda-9e97-a1b71ccfea57
+# ╠═f2f14f9f-8bfd-4642-ac69-1db28298d8ab
 # ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
 # ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
-# ╠═4c191bcd-a6fc-4df6-8cfa-2819d7e779b7
-# ╠═89cb4f11-16b4-4959-b2fa-000aae8725a0
-# ╠═fa2f0c74-ce4e-4b1c-9e5d-824adefdfdc9
-# ╠═465dd672-56e0-4ac1-a69e-de3fce24051a
 # ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
+# ╠═c6a5665e-2b18-49e9-93eb-c44a8afff73b
 # ╠═a6219cca-c24a-40f5-9e17-749f115050a2
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
 # ╠═a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
 # ╠═81d75374-db13-465d-9fd5-ca5efab645e2
-# ╠═751e709e-1290-41d8-a208-ef117fc0d95b
-# ╠═406444d5-92f9-4ca6-b56c-a91dd7b45710
+# ╟─bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
+# ╠═fccf6474-aab9-471b-bf69-73ac24d306d6
 # ╠═f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
 # ╠═46ef453d-6538-46bf-8522-3d61a2807701
-# ╠═327bccc6-9f18-4bd4-b420-34fb89856149
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
