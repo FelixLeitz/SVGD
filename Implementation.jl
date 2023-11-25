@@ -21,10 +21,10 @@ This is a short implementation of basic **SVGD** principles for a toy example.
 """
 
 # ╔═╡ e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
-np=5
+np=6
 
 # ╔═╡ 408009b6-3f3c-4cb9-a4d0-8ef4da948b84
-ni=400
+ni=100
 
 # ╔═╡ 44c16b2d-5e33-4f99-972e-0506065fca63
 stepsize=1
@@ -35,7 +35,7 @@ First of all the different functions which will be used need to be defined."""
 
 # ╔═╡ acb67c33-0b23-459e-aa82-a84687a15de2
 begin
-function p(xj)
+function gauss(xj)
 	n=2
 	σ=2
 	μ=zeros(n,1)
@@ -45,26 +45,54 @@ end
 
 # ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
 begin
-function logp(xj)
-	f=log(p(xj))
+function loggauss(xj)
+	f=log(gauss(xj))
 	return f
 end
 end
 
 # ╔═╡ 597721db-82fe-40b0-bd79-695f7d1f1a27
 begin
-gradlogp(x::T) where{T<:Real} = ForwardDiff.derivative(x->logp(x),x)
-gradlogp(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->logp(x),x)
+gradloggauss(x::T) where{T<:Real} = ForwardDiff.derivative(x->loggauss(x),x)
+gradloggauss(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->loggauss(x),x)
 end
 
+# ╔═╡ 27b5dc62-c39e-4997-9ea3-47e6831799aa
+function rastrigin(x)
+	A=10.0
+	n=length(x)
+	f=A*n
+	for xi in x
+		f+= xi^2 - A*(cos(2*pi*xi))
+	end
+	return f
+end
+
+# ╔═╡ 4a97a49e-7b9d-4563-b540-3a65e001a1c7
+lograst(x) = log(rastrigin(x))
+
+# ╔═╡ 15078951-4950-42c0-ae07-c6092fc8ada9
+gradlograst = x -> ForwardDiff.gradient(lograst,x)
+
 # ╔═╡ 0ca64d1c-a648-4e79-ac77-1861604e73cb
-rosenbrock(x) = (1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2
+rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
 
 # ╔═╡ 95536a80-43dd-4fda-9e97-a1b71ccfea57
-logr(x) = log(rosenbrock(x))
+logros(x) = log(rosenbrock(x))
 
 # ╔═╡ f2f14f9f-8bfd-4642-ac69-1db28298d8ab
-gradlogr = x -> ForwardDiff.gradient(logr,x)
+gradlogros = x -> ForwardDiff.gradient(logros,x)
+
+# ╔═╡ 31146ada-0221-4294-a57e-5dfe6d62841b
+function hybrid_rosenbrock(x,n1,n2,a,b,μ)
+	sum=a*(x[1,1]-μ)^2
+	for j in 1:n2
+		for i in 2:n1
+			sum+=b[j,i]*(x[j,i]-x[j,i-1]^2)^2
+		end
+	end
+	return exp(-sum)
+end
 
 # ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
 begin
@@ -86,7 +114,7 @@ function ϕ(xi,x)
 	n=2
 	sum=zeros(2,1)
 	for j in 1:np^2
-		sum+=k(x[j,:],xi)*gradlogp(x[j,:])+gradk(x[j,:],xi)
+		sum+=k(x[j,:],xi)*gradlograst(x[j,:])+gradk(x[j,:],xi) 
 	end
 	return 1/size(x,1)*sum
 end
@@ -97,15 +125,18 @@ md"""### SVGD
 Iterative method for approximation proposed in (Liu, Wang 2016)."""
 
 # ╔═╡ c6a5665e-2b18-49e9-93eb-c44a8afff73b
-function grid(n)
-	tuples = Iterators.product(-1.:0.01:0.0, -1.:0.01:0.0, -1.:0.01:0.0)
+function grid()
+	tuples = Iterators.product(-1.:0.03:0.0, -1.:0.03:0.0, -1.:0.03:0.0,-1.:0.03:0.0)
 	tuples = vec(collect(tuples))
-	grid=zeros(length(tuples),n);
+	grid=zeros(length(tuples),4);
 	for i in 1:length(tuples)
 		grid[i,:]=[j for j in tuples[i]]
 	end
 	return grid
 end
+
+# ╔═╡ 5916244b-3f0a-4513-89e2-06583b7f53fd
+grid();
 
 # ╔═╡ a6219cca-c24a-40f5-9e17-749f115050a2
 function meshgrid(x, y)
@@ -117,8 +148,8 @@ end
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
 ϵ= stepsize
-x = LinRange(-2,-1,np)
-y = LinRange(-2,-1,np)	
+x = LinRange(-1,1,np)
+y = LinRange(-1,1,np)	
 xx,yy = meshgrid(x,y)
 X = [[xx[i],yy[i]] for i in eachindex(xx)]
 particles=reduce(hcat,X)'
@@ -146,29 +177,32 @@ md"""from https://docs.juliaplots.org/latest/gallery/gr/generated/gr-ref022/#gr_
 
 # ╔═╡ fccf6474-aab9-471b-bf69-73ac24d306d6
 begin
-a = -4:0.1:4
-b = -4:0.1:4
+a = -5:0.1:5
+b = -5:0.1:5
 f(x, y) = begin
-        p([x,y])
+        rastrigin([x y])#p([x,y])
     end
 x_grid = repeat(reshape(a, 1, :), length(b), 1)
 y_grid = repeat(b, 1, length(a))
 mapping_p = map(f, x_grid, y_grid)
-cont1 = contour(a, b, f, fill = true)
+cont1 = contour(a, b, mapping_p, fill = true)
 cont2 = contour(a, b, mapping_p)
 end;
+
+# ╔═╡ cf06c607-3fad-48a6-b2fc-2caa5019cf43
+Iterations[1,:,:]
 
 # ╔═╡ f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
 animation=@animate for i in 1:ni
 	plot(cont2)
 	scatter!(Iterations[i,:,1],Iterations[i,:,2],legend=false,color="black")
-	xlims!(-4,4)
-	ylims!(-4,4)
+	xlims!(-5,5)
+	ylims!(-5,5)
 	zlims!(0,0.1)
 end
 
 # ╔═╡ 46ef453d-6538-46bf-8522-3d61a2807701
-gif(animation,fps=40)
+gif(animation,fps=20)
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1811,20 +1845,26 @@ version = "1.4.1+1"
 # ╠═acb67c33-0b23-459e-aa82-a84687a15de2
 # ╠═8c999fa4-b887-44d1-831f-0220c3759cda
 # ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
+# ╠═27b5dc62-c39e-4997-9ea3-47e6831799aa
+# ╠═4a97a49e-7b9d-4563-b540-3a65e001a1c7
+# ╠═15078951-4950-42c0-ae07-c6092fc8ada9
 # ╠═0ca64d1c-a648-4e79-ac77-1861604e73cb
 # ╠═95536a80-43dd-4fda-9e97-a1b71ccfea57
 # ╠═f2f14f9f-8bfd-4642-ac69-1db28298d8ab
+# ╠═31146ada-0221-4294-a57e-5dfe6d62841b
 # ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
 # ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 # ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
 # ╠═c6a5665e-2b18-49e9-93eb-c44a8afff73b
+# ╠═5916244b-3f0a-4513-89e2-06583b7f53fd
 # ╠═a6219cca-c24a-40f5-9e17-749f115050a2
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
 # ╠═a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
 # ╠═81d75374-db13-465d-9fd5-ca5efab645e2
 # ╟─bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
 # ╠═fccf6474-aab9-471b-bf69-73ac24d306d6
+# ╠═cf06c607-3fad-48a6-b2fc-2caa5019cf43
 # ╠═f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
 # ╠═46ef453d-6538-46bf-8522-3d61a2807701
 # ╟─00000000-0000-0000-0000-000000000001
