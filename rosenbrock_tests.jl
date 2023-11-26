@@ -4,7 +4,7 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ a8577720-7990-11ee-3a5e-eb35a337d22d
+# ╔═╡ 038b4f11-c95f-459a-97cf-9869e653ec04
 begin
 	using Plots
 	using PlutoUI
@@ -14,75 +14,7 @@ begin
 	using ForwardDiff
 end
 
-# ╔═╡ 75503983-557f-4926-9f2e-478d381bf731
-md"""# SVGD 
-This is a short implementation of basic **SVGD** principles for a toy example.
-"""
-
-# ╔═╡ e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
-np=4
-
-# ╔═╡ 408009b6-3f3c-4cb9-a4d0-8ef4da948b84
-ni=100
-
-# ╔═╡ 44c16b2d-5e33-4f99-972e-0506065fca63
-stepsize=0.1
-
-# ╔═╡ 2d45645a-2798-42fa-9399-a110cd890e70
-md"""## Functions
-First of all the different functions which will be used need to be defined."""
-
-# ╔═╡ acb67c33-0b23-459e-aa82-a84687a15de2
-begin
-function gauss(xj)
-	n=2
-	σ=2
-	μ=zeros(n,1)
-	return 1/(σ*sqrt((2*pi)^n))*exp(-norm(xj-μ)^2/(2*σ^2))
-end
-end
-
-# ╔═╡ 8c999fa4-b887-44d1-831f-0220c3759cda
-begin
-function loggauss(xj)
-	f=log(gauss(xj))
-	return f
-end
-end
-
-# ╔═╡ 597721db-82fe-40b0-bd79-695f7d1f1a27
-begin
-gradloggauss(x::T) where{T<:Real} = ForwardDiff.derivative(x->loggauss(x),x)
-gradloggauss(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->loggauss(x),x)
-end
-
-# ╔═╡ 27b5dc62-c39e-4997-9ea3-47e6831799aa
-function rastrigin(x)
-	A=10.0
-	n=length(x)
-	f=A*n
-	for xi in x
-		f+= xi^2 - A*(cos(2*pi*xi))
-	end
-	return f
-end
-
-# ╔═╡ 4a97a49e-7b9d-4563-b540-3a65e001a1c7
-lograst(x) = log(rastrigin(x))
-
-# ╔═╡ 15078951-4950-42c0-ae07-c6092fc8ada9
-gradlograst = x -> ForwardDiff.gradient(lograst,x)
-
-# ╔═╡ 0ca64d1c-a648-4e79-ac77-1861604e73cb
-rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
-
-# ╔═╡ 95536a80-43dd-4fda-9e97-a1b71ccfea57
-logros(x) = log(rosenbrock(x))
-
-# ╔═╡ f2f14f9f-8bfd-4642-ac69-1db28298d8ab
-gradlogros = x -> ForwardDiff.gradient(logros,x)
-
-# ╔═╡ 31146ada-0221-4294-a57e-5dfe6d62841b
+# ╔═╡ 76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
 function hybrid_rosenbrock(x,n1,n2,a,b,μ)
 	sum=a*(x[1]-μ)^2
 	c=2
@@ -99,37 +31,7 @@ function hybrid_rosenbrock(x,n1,n2,a,b,μ)
 	return normalization*exp(-sum)
 end
 
-# ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
-begin
-function k(x1,x2)
-	h=1.0
-	return exp(-norm(x1-x2)^2/h)
-end
-end
-
-# ╔═╡ 3f5cbd17-2c3b-4149-8422-bfb6845177a0
-begin
-gradk(x1::T,x2) where {T<:Real}= ForwardDiff.derivative(x1->k(x1,x2),x1)
-gradk(x1::AbstractArray{T},x2) where {T<:Real} = ForwardDiff.gradient(x1->k(x1,x2),x1)
-end
-
-# ╔═╡ f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
-begin
-function ϕ(xi,x)
-	n=2
-	sum=zeros(2,1)
-	for j in 1:np^2
-		sum+=k(x[j,:],xi)*gradlogros(x[j,:])+gradk(x[j,:],xi) 
-	end
-	return 1/size(x,1)*sum
-end
-end
-
-# ╔═╡ 273f06ed-4ea0-499a-9cbc-9728ff5a6d38
-md"""### SVGD
-Iterative method for approximation proposed in (Liu, Wang 2016)."""
-
-# ╔═╡ c6a5665e-2b18-49e9-93eb-c44a8afff73b
+# ╔═╡ 2ac0f29b-a82a-4e87-908a-f0fcad5fb600
 function ndgrid()
 	tuples = Iterators.product(-1.:0.03:0.0, -1.:0.03:0.0, -1.:0.03:0.0,-1.:0.03:0.0)
 	tuples = vec(collect(tuples))
@@ -140,74 +42,8 @@ function ndgrid()
 	return grid
 end
 
-# ╔═╡ 5916244b-3f0a-4513-89e2-06583b7f53fd
-ndgrid();
-
-# ╔═╡ a6219cca-c24a-40f5-9e17-749f115050a2
-function meshgrid(x, y)
-    aa = x' .* ones(length(x))
-    bb = ones(length(y))' .* y
-    return aa, bb
-end
-
-# ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
-begin
-ϵ= stepsize
-x = LinRange(-1,1,np)
-y = LinRange(-3,-2,np)	
-xx,yy = meshgrid(x,y)
-X = [[xx[i],yy[i]] for i in eachindex(xx)]
-particles=reduce(hcat,X)'
-temp=zeros(np^2,2)
-end;
-
-# ╔═╡ c3b327f1-e67d-4792-8d43-af600d36b73d
-ϕ([-3;-2],particles)
-
-# ╔═╡ a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
-begin
-	Iterations=zeros(ni,np^2,2)
-end;
-
-# ╔═╡ 81d75374-db13-465d-9fd5-ca5efab645e2
-begin
-for j in 1:ni
-	for i in 1:np^2
-		temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles)
-	end	
-	particles=copy(temp)
-	Iterations[j,:,:]=copy(temp)
-end
-end
-
-# ╔═╡ bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
-md"""from https://docs.juliaplots.org/latest/gallery/gr/generated/gr-ref022/#gr_ref022"""
-
-# ╔═╡ fccf6474-aab9-471b-bf69-73ac24d306d6
-begin
-a = -5:0.05:5
-b = -5:0.05:5
-f(x, y) = begin
-        rosenbrock([x y])#p([x,y])
-    end
-x_grid = repeat(reshape(a, 1, :), length(b), 1)
-y_grid = repeat(b, 1, length(a))
-mapping_p = map(f, x_grid, y_grid)
-cont1 = contour(a, b, mapping_p, fill = true)
-cont2 = contour(a, b, mapping_p,fill =(true,cgrad(:oxy, scale=:log)))
-end;
-
-# ╔═╡ f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
-animation=@animate for i in 1:ni
-	plot(cont2)
-	scatter!(Iterations[i,:,1],Iterations[i,:,2],legend=false,color="orange")
-	xlims!(-5,5)
-	ylims!(-1,5)
-	zlims!(0,0.1)
-end
-
-# ╔═╡ 46ef453d-6538-46bf-8522-3d61a2807701
-gif(animation,fps=20)
+# ╔═╡ b525fb70-0f52-4051-b664-1bd9305201bb
+gr()
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -261,6 +97,11 @@ uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
 
+[[deps.BitFlags]]
+git-tree-sha1 = "43b1a4a8f797c1cddadf60499a8a077d4af2cd2d"
+uuid = "d1d4a3ce-64b1-5f1a-9ba4-7e7e69966f35"
+version = "0.1.7"
+
 [[deps.Bzip2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "19a35467a82e236ff51bc17a3a44b69ef35185a2"
@@ -294,6 +135,12 @@ weakdeps = ["SparseArrays"]
 
     [deps.ChainRulesCore.extensions]
     ChainRulesCoreSparseArraysExt = "SparseArrays"
+
+[[deps.CodecZlib]]
+deps = ["TranscodingStreams", "Zlib_jll"]
+git-tree-sha1 = "cd67fc487743b2f0fd4380d4cbd3a24660d0eec8"
+uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
+version = "0.7.3"
 
 [[deps.ColorSchemes]]
 deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "PrecompileTools", "Random"]
@@ -343,6 +190,12 @@ weakdeps = ["Dates", "LinearAlgebra"]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
 version = "1.0.5+0"
+
+[[deps.ConcurrentUtilities]]
+deps = ["Serialization", "Sockets"]
+git-tree-sha1 = "5372dbbf8f0bdb8c700db5367132925c0771ef7e"
+uuid = "f0e56b4a-5159-44fe-b623-3e5288b988bb"
+version = "2.2.1"
 
 [[deps.ConstructionBase]]
 deps = ["LinearAlgebra"]
@@ -459,6 +312,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "8e9441ee83492030ace98f9789a654a6d0b1f643"
 uuid = "2702e6a9-849d-5ed8-8c21-79e8b8f9ee43"
 version = "0.0.20230411+0"
+
+[[deps.ExceptionUnwrapping]]
+deps = ["Test"]
+git-tree-sha1 = "e90caa41f5a86296e014e148ee061bd6c3edec96"
+uuid = "460bff9d-24e4-43bc-9d9f-a8973cb893f4"
+version = "0.1.9"
 
 [[deps.Expat_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -580,10 +439,10 @@ uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
 
 [[deps.HTTP]]
-deps = ["Base64", "Dates", "IniFile", "Logging", "MbedTLS", "NetworkOptions", "Sockets", "URIs"]
-git-tree-sha1 = "0fa77022fe4b511826b39c894c90daf5fce3334a"
+deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
+git-tree-sha1 = "5eab648309e2e060198b45820af1a37182de3cce"
 uuid = "cd3eb016-35fb-5094-929b-558a96fad6f3"
-version = "0.9.17"
+version = "1.10.0"
 
 [[deps.HarfBuzz_jll]]
 deps = ["Artifacts", "Cairo_jll", "Fontconfig_jll", "FreeType2_jll", "Glib_jll", "Graphite2_jll", "JLLWrappers", "Libdl", "Libffi_jll", "Pkg"]
@@ -614,11 +473,6 @@ deps = ["Logging", "Random"]
 git-tree-sha1 = "d75853a0bdbfb1ac815478bacd89cd27b550ace6"
 uuid = "b5f81e59-6552-4d32-b1f0-c071b021bf89"
 version = "0.2.3"
-
-[[deps.IniFile]]
-git-tree-sha1 = "f550e6e32074c939295eb5ea6de31849ac2c9625"
-uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
-version = "0.5.1"
 
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
@@ -794,6 +648,12 @@ version = "0.3.26"
 [[deps.Logging]]
 uuid = "56ddb016-857b-54e1-b83d-db4d58db5568"
 
+[[deps.LoggingExtras]]
+deps = ["Dates", "Logging"]
+git-tree-sha1 = "c1dd6d7978c12545b4179fb6153b9250c96b0075"
+uuid = "e6f89c97-d47a-5376-807f-9c37f3926c36"
+version = "1.0.3"
+
 [[deps.MIMEs]]
 git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
 uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
@@ -863,6 +723,12 @@ version = "0.3.21+4"
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
 version = "0.8.1+0"
+
+[[deps.OpenSSL]]
+deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
+git-tree-sha1 = "51901a49222b09e3743c65b8847687ae5fc78eb2"
+uuid = "4d8831e6-92b7-49fb-bdf8-b643e874388c"
+version = "1.4.1"
 
 [[deps.OpenSSL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1060,6 +926,11 @@ git-tree-sha1 = "91eddf657aca81df9ae6ceb20b959ae5653ad1de"
 uuid = "992d4aef-0814-514b-bc4d-f2e9a6c4116f"
 version = "1.0.3"
 
+[[deps.SimpleBufferStream]]
+git-tree-sha1 = "874e8867b33a00e784c8a7e4b60afe9e037b74e1"
+uuid = "777ac1f9-54b0-4bf8-805c-2214025038e7"
+version = "1.1.0"
+
 [[deps.Sockets]]
 uuid = "6462fe0b-24de-5631-8697-dd941f90decc"
 
@@ -1187,6 +1058,15 @@ deps = ["Dates", "Test"]
 git-tree-sha1 = "f73f62d4b2ba21649d237722507f9b0ccc9d8b94"
 uuid = "b28a226c-6cff-11e9-1336-699fd753ab00"
 version = "0.1.0"
+
+[[deps.TranscodingStreams]]
+git-tree-sha1 = "49cbf7c74fafaed4c529d47d48c8f7da6a19eb75"
+uuid = "3bb67fe8-82b1-5028-8e26-92a6c54297fa"
+version = "0.10.1"
+weakdeps = ["Random", "Test"]
+
+    [deps.TranscodingStreams.extensions]
+    TestExt = ["Test", "Random"]
 
 [[deps.Tricks]]
 git-tree-sha1 = "eae1bb484cd63b36999ee58be2de6c178105112f"
@@ -1534,36 +1414,9 @@ version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
-# ╟─75503983-557f-4926-9f2e-478d381bf731
-# ╠═a8577720-7990-11ee-3a5e-eb35a337d22d
-# ╠═e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
-# ╠═408009b6-3f3c-4cb9-a4d0-8ef4da948b84
-# ╠═44c16b2d-5e33-4f99-972e-0506065fca63
-# ╟─2d45645a-2798-42fa-9399-a110cd890e70
-# ╠═acb67c33-0b23-459e-aa82-a84687a15de2
-# ╠═8c999fa4-b887-44d1-831f-0220c3759cda
-# ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
-# ╠═27b5dc62-c39e-4997-9ea3-47e6831799aa
-# ╠═4a97a49e-7b9d-4563-b540-3a65e001a1c7
-# ╠═15078951-4950-42c0-ae07-c6092fc8ada9
-# ╠═0ca64d1c-a648-4e79-ac77-1861604e73cb
-# ╠═95536a80-43dd-4fda-9e97-a1b71ccfea57
-# ╠═f2f14f9f-8bfd-4642-ac69-1db28298d8ab
-# ╠═31146ada-0221-4294-a57e-5dfe6d62841b
-# ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
-# ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
-# ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
-# ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
-# ╠═c6a5665e-2b18-49e9-93eb-c44a8afff73b
-# ╠═5916244b-3f0a-4513-89e2-06583b7f53fd
-# ╠═a6219cca-c24a-40f5-9e17-749f115050a2
-# ╠═8d078e0f-862a-42e0-8475-565ad512b14c
-# ╠═c3b327f1-e67d-4792-8d43-af600d36b73d
-# ╠═a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
-# ╠═81d75374-db13-465d-9fd5-ca5efab645e2
-# ╟─bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
-# ╠═fccf6474-aab9-471b-bf69-73ac24d306d6
-# ╠═f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
-# ╠═46ef453d-6538-46bf-8522-3d61a2807701
+# ╠═038b4f11-c95f-459a-97cf-9869e653ec04
+# ╠═76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
+# ╠═2ac0f29b-a82a-4e87-908a-f0fcad5fb600
+# ╠═b525fb70-0f52-4051-b664-1bd9305201bb
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
