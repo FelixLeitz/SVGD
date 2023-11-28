@@ -9,24 +9,26 @@ begin
 	using Plots
 	using PlutoUI
 	using LinearAlgebra
+	using Distributions
 	using DistributionsAD
 	using Todo
 	using ForwardDiff
+	using HCubature
 end
 
 # ╔═╡ 75503983-557f-4926-9f2e-478d381bf731
 md"""# SVGD 
-This is a short implementation of basic **SVGD** principles for a toy example.
+This is a short implementation of basic **SVGD** principles for a standard rosenbrock distribution. The functions as well as the parameters can be tweaked/replaced as necessary for the task at hand.
 """
 
 # ╔═╡ e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
-np=4
+np=6
 
 # ╔═╡ 408009b6-3f3c-4cb9-a4d0-8ef4da948b84
-ni=100
+ni=1000
 
 # ╔═╡ 44c16b2d-5e33-4f99-972e-0506065fca63
-stepsize=0.1
+stepsize=.1
 
 # ╔═╡ 2d45645a-2798-42fa-9399-a110cd890e70
 md"""## Functions
@@ -74,30 +76,13 @@ lograst(x) = log(rastrigin(x))
 gradlograst = x -> ForwardDiff.gradient(lograst,x)
 
 # ╔═╡ 0ca64d1c-a648-4e79-ac77-1861604e73cb
-rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
+rosenbrock(x) = sqrt(0.05*5)/π*exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
 
 # ╔═╡ 95536a80-43dd-4fda-9e97-a1b71ccfea57
 logros(x) = log(rosenbrock(x))
 
 # ╔═╡ f2f14f9f-8bfd-4642-ac69-1db28298d8ab
 gradlogros = x -> ForwardDiff.gradient(logros,x)
-
-# ╔═╡ 31146ada-0221-4294-a57e-5dfe6d62841b
-function hybrid_rosenbrock(x,n1,n2,a,b,μ)
-	sum=a*(x[1]-μ)^2
-	c=2
-	n=(n1-1)*n2+1
-	normalization=(sqrt(a)*sqrt(b)^(n-1))/(π^n)
-	for j in 1:n2
-		sum+=b*(x[c]-x[1]^2)^2
-		c+=1
-		for i in 3:n1
-			sum+=b*(x[c]-x[c-1]^2)^2
-			c+=1
-		end
-	end
-	return normalization*exp(-sum)
-end
 
 # ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
 begin
@@ -129,6 +114,9 @@ end
 md"""### SVGD
 Iterative method for approximation proposed in (Liu, Wang 2016)."""
 
+# ╔═╡ 17fecc47-6328-4e40-8cd7-08aa15aa6e1e
+md"""##### Grid methods"""
+
 # ╔═╡ c6a5665e-2b18-49e9-93eb-c44a8afff73b
 function ndgrid()
 	tuples = Iterators.product(-1.:0.03:0.0, -1.:0.03:0.0, -1.:0.03:0.0,-1.:0.03:0.0)
@@ -140,15 +128,15 @@ function ndgrid()
 	return grid
 end
 
-# ╔═╡ 5916244b-3f0a-4513-89e2-06583b7f53fd
-ndgrid();
-
 # ╔═╡ a6219cca-c24a-40f5-9e17-749f115050a2
 function meshgrid(x, y)
     aa = x' .* ones(length(x))
     bb = ones(length(y))' .* y
     return aa, bb
 end
+
+# ╔═╡ 394b9dde-fd2c-423f-8502-5b7ad233795b
+md"""##### Initialisation"""
 
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
@@ -159,15 +147,11 @@ xx,yy = meshgrid(x,y)
 X = [[xx[i],yy[i]] for i in eachindex(xx)]
 particles=reduce(hcat,X)'
 temp=zeros(np^2,2)
+Iterations=zeros(ni,np^2,2)
 end;
 
-# ╔═╡ c3b327f1-e67d-4792-8d43-af600d36b73d
-ϕ([-3;-2],particles)
-
-# ╔═╡ a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
-begin
-	Iterations=zeros(ni,np^2,2)
-end;
+# ╔═╡ 11256e61-56fa-4169-bdbc-750201e14fe0
+md"""##### Iterative update process"""
 
 # ╔═╡ 81d75374-db13-465d-9fd5-ca5efab645e2
 begin
@@ -180,15 +164,71 @@ for j in 1:ni
 end
 end
 
+# ╔═╡ b525d418-5ea7-460d-ad6a-39866ff9a828
+md"""##### Expected values and variance for each iteration"""
+
+# ╔═╡ 78d7f3c8-cd1b-45f1-8260-4011949f4cc1
+begin
+expected=zeros(ni,2)
+variance=zeros(ni,2)
+covariance=zeros(ni,1)
+for j in 1:ni
+	for i in 1:np^2
+		expected[j,:]+=Iterations[j,i,:]
+	end
+	expected[j,:]=expected[j,:]/(np^2-1)
+	for i in 1:np^2
+		variance[j,:]+=(Iterations[j,i,:]-expected[j,:]).^2
+		covariance[j]+=(Iterations[j,i,1]-expected[j,1])*(Iterations[j,i,2]-expected[j,2])
+	end
+	covariance[j]=covariance[j]/(np^2-1)
+	variance[j,:]=variance[j,:]/(np^2-1)
+end
+end
+
+# ╔═╡ 7e13d38b-1db9-49c7-b655-60da3d266861
+l(x)=exp(-(x[1]^2+x[2]^2))
+
+# ╔═╡ e89a305d-6ce2-4fbd-bdb3-7ea79a1b57ff
+function marginalization(f,n)
+	fineness=1
+	points=11
+	start=-5
+	margs=zeros(points,n)
+	if n==2
+		for j in 0:n-1
+			for i in 1:points
+				ü=start+fineness*(i-1)
+				rintx(x)=f([ü x])
+				rinty(x)=f([x ü])
+				margs[i,1]=hquadrature(rintx,-5,5)[1]
+				margs[i,2]=hquadrature(rinty,-5,5)[1]
+			end
+		end
+	else
+		for j in 0:n-1
+			for i in 1:points
+				ü=start+fineness*(i-1)
+				rint(x)=f(vcat(x[1:j],ü,x[j+1:n-1]))
+				margs[i,j+1]=hcubature(rint,[-5,-5],[5,5])[1]
+			end
+		end
+	end
+	return margs
+end
+
+# ╔═╡ 2b7f02b2-6029-44cf-85b5-7759e8a60279
+md"""##### Visualization"""
+
 # ╔═╡ bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
 md"""from https://docs.juliaplots.org/latest/gallery/gr/generated/gr-ref022/#gr_ref022"""
 
 # ╔═╡ fccf6474-aab9-471b-bf69-73ac24d306d6
 begin
 a = -5:0.05:5
-b = -5:0.05:5
+b = -1:0.05:6
 f(x, y) = begin
-        rosenbrock([x y])#p([x,y])
+        rosenbrock([x,y])#p([x,y])
     end
 x_grid = repeat(reshape(a, 1, :), length(b), 1)
 y_grid = repeat(b, 1, length(a))
@@ -197,31 +237,68 @@ cont1 = contour(a, b, mapping_p, fill = true)
 cont2 = contour(a, b, mapping_p,fill =(true,cgrad(:oxy, scale=:log)))
 end;
 
+# ╔═╡ 9b52a48c-30ba-4903-8728-240917a95005
+md"""#### Comparison to true density function
+(blue dot represents expected value of SVGD approximation)"""
+
 # ╔═╡ f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
+# ╠═╡ disabled = true
+#=╠═╡
 animation=@animate for i in 1:ni
 	plot(cont2)
 	scatter!(Iterations[i,:,1],Iterations[i,:,2],legend=false,color="orange")
-	xlims!(-5,5)
-	ylims!(-1,5)
-	zlims!(0,0.1)
+	scatter!((expected[i,1],expected[i,2]),legend=false,color="blue")
+	xlims!(-3,3)
+	ylims!(-1,3)
 end
+  ╠═╡ =#
 
 # ╔═╡ 46ef453d-6538-46bf-8522-3d61a2807701
+#=╠═╡
 gif(animation,fps=20)
+  ╠═╡ =#
+
+# ╔═╡ f2103fd9-8f3c-48ca-b36c-1e95b5b43e09
+begin
+plot(cont2)
+scatter!((Iterations[ni,:,1],Iterations[ni,:,2]))
+scatter!((expected[ni,1],expected[ni,2]),legend=false,color="blue")
+end
+
+# ╔═╡ fd2bc0f5-7d55-4620-a128-e22fc69c6d66
+md"""###### Expected values at different iterations"""
+
+# ╔═╡ 8441bb4d-8c9f-459d-9241-94378f1045b2
+begin
+	scatter(expected[:,1],expected[:,2],label="expected values",color="dark red")
+end
+
+# ╔═╡ 54a48193-12e9-48e2-8d33-c9f769d114c0
+begin
+	
+	scatter(variance[:,1],label="var(X)",color="blue")
+	ylims!(0,10)
+	scatter!(variance[:,2],label="var(Y)",color="green")
+	scatter!(covariance[:],label="cov(X,Y)",color="red")
+end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DistributionsAD = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
+HCubature = "19dc6840-f33b-545b-b366-655c7e3ffd49"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 Todo = "b28a226c-6cff-11e9-1336-699fd753ab00"
 
 [compat]
+Distributions = "~0.25.102"
 DistributionsAD = "~0.6.53"
 ForwardDiff = "~0.10.36"
+HCubature = "~1.5.1"
 Plots = "~1.39.0"
 PlutoUI = "~0.7.52"
 Todo = "~0.1.0"
@@ -233,7 +310,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "e36f42680166839fe35284bfbe3832d115227b1c"
+project_hash = "4e0e7a82b59d837f90f7f578256966cf26d959d7"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -322,6 +399,11 @@ deps = ["ColorTypes", "FixedPointNumbers", "Reexport"]
 git-tree-sha1 = "fc08e5930ee9a4e03f84bfb5211cb54e7769758a"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.12.10"
+
+[[deps.Combinatorics]]
+git-tree-sha1 = "08c8b6831dc00bfea825826be0bc8336fc369860"
+uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
+version = "1.0.2"
 
 [[deps.CommonSubexpressions]]
 deps = ["MacroTools", "Test"]
@@ -578,6 +660,12 @@ version = "1.3.14+0"
 git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
 uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
+
+[[deps.HCubature]]
+deps = ["Combinatorics", "DataStructures", "LinearAlgebra", "QuadGK", "StaticArrays"]
+git-tree-sha1 = "e95b36755023def6ebc3d269e6483efa8b2f7f65"
+uuid = "19dc6840-f33b-545b-b366-655c7e3ffd49"
+version = "1.5.1"
 
 [[deps.HTTP]]
 deps = ["Base64", "Dates", "IniFile", "Logging", "MbedTLS", "NetworkOptions", "Sockets", "URIs"]
@@ -1540,30 +1628,39 @@ version = "1.4.1+1"
 # ╠═408009b6-3f3c-4cb9-a4d0-8ef4da948b84
 # ╠═44c16b2d-5e33-4f99-972e-0506065fca63
 # ╟─2d45645a-2798-42fa-9399-a110cd890e70
-# ╠═acb67c33-0b23-459e-aa82-a84687a15de2
-# ╠═8c999fa4-b887-44d1-831f-0220c3759cda
-# ╠═597721db-82fe-40b0-bd79-695f7d1f1a27
-# ╠═27b5dc62-c39e-4997-9ea3-47e6831799aa
-# ╠═4a97a49e-7b9d-4563-b540-3a65e001a1c7
-# ╠═15078951-4950-42c0-ae07-c6092fc8ada9
-# ╠═0ca64d1c-a648-4e79-ac77-1861604e73cb
-# ╠═95536a80-43dd-4fda-9e97-a1b71ccfea57
-# ╠═f2f14f9f-8bfd-4642-ac69-1db28298d8ab
-# ╠═31146ada-0221-4294-a57e-5dfe6d62841b
-# ╠═331f6880-27d3-4d42-9039-98a2066a8fdf
-# ╠═3f5cbd17-2c3b-4149-8422-bfb6845177a0
+# ╟─acb67c33-0b23-459e-aa82-a84687a15de2
+# ╟─8c999fa4-b887-44d1-831f-0220c3759cda
+# ╟─597721db-82fe-40b0-bd79-695f7d1f1a27
+# ╟─27b5dc62-c39e-4997-9ea3-47e6831799aa
+# ╟─4a97a49e-7b9d-4563-b540-3a65e001a1c7
+# ╟─15078951-4950-42c0-ae07-c6092fc8ada9
+# ╟─0ca64d1c-a648-4e79-ac77-1861604e73cb
+# ╟─95536a80-43dd-4fda-9e97-a1b71ccfea57
+# ╟─f2f14f9f-8bfd-4642-ac69-1db28298d8ab
+# ╟─331f6880-27d3-4d42-9039-98a2066a8fdf
+# ╟─3f5cbd17-2c3b-4149-8422-bfb6845177a0
 # ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 # ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
-# ╠═c6a5665e-2b18-49e9-93eb-c44a8afff73b
-# ╠═5916244b-3f0a-4513-89e2-06583b7f53fd
-# ╠═a6219cca-c24a-40f5-9e17-749f115050a2
+# ╟─17fecc47-6328-4e40-8cd7-08aa15aa6e1e
+# ╟─c6a5665e-2b18-49e9-93eb-c44a8afff73b
+# ╟─a6219cca-c24a-40f5-9e17-749f115050a2
+# ╟─394b9dde-fd2c-423f-8502-5b7ad233795b
 # ╠═8d078e0f-862a-42e0-8475-565ad512b14c
-# ╠═c3b327f1-e67d-4792-8d43-af600d36b73d
-# ╠═a03d0cc3-e3bb-4df7-962e-f9480ba0f5c4
+# ╟─11256e61-56fa-4169-bdbc-750201e14fe0
 # ╠═81d75374-db13-465d-9fd5-ca5efab645e2
+# ╟─b525d418-5ea7-460d-ad6a-39866ff9a828
+# ╠═78d7f3c8-cd1b-45f1-8260-4011949f4cc1
+# ╠═7e13d38b-1db9-49c7-b655-60da3d266861
+# ╠═e89a305d-6ce2-4fbd-bdb3-7ea79a1b57ff
+# ╟─2b7f02b2-6029-44cf-85b5-7759e8a60279
 # ╟─bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
 # ╠═fccf6474-aab9-471b-bf69-73ac24d306d6
-# ╠═f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
-# ╠═46ef453d-6538-46bf-8522-3d61a2807701
+# ╟─9b52a48c-30ba-4903-8728-240917a95005
+# ╟─f941eb31-d2b4-47e2-a6a5-7d5bcd8e19a7
+# ╟─46ef453d-6538-46bf-8522-3d61a2807701
+# ╠═f2103fd9-8f3c-48ca-b36c-1e95b5b43e09
+# ╟─fd2bc0f5-7d55-4620-a128-e22fc69c6d66
+# ╠═8441bb4d-8c9f-459d-9241-94378f1045b2
+# ╠═54a48193-12e9-48e2-8d33-c9f769d114c0
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

@@ -14,6 +14,12 @@ begin
 	using ForwardDiff
 end
 
+# ╔═╡ bb6916c1-7056-44b3-a8ab-f7b03c0945b4
+md"""### Underlying framework"""
+
+# ╔═╡ b525fb70-0f52-4051-b664-1bd9305201bb
+gr()
+
 # ╔═╡ 76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
 function hybrid_rosenbrock(x,n1,n2,a,b,μ)
 	sum=a*(x[1]-μ)^2
@@ -31,6 +37,44 @@ function hybrid_rosenbrock(x,n1,n2,a,b,μ)
 	return normalization*exp(-sum)
 end
 
+# ╔═╡ f0ab61b2-abea-4daa-838c-73d9b6513796
+begin
+	rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
+	rosenbrock(x,y)= exp(-((1.0 - x)^2 + 100 * (y - x^2)^2)/20)
+end
+
+# ╔═╡ 9c7c45fc-df01-48b7-a8cf-162bbdf756a6
+logros(x) = log(rosenbrock(x))
+
+# ╔═╡ d71ec419-c995-4425-8196-b5cd20d67957
+gradlogros = x -> ForwardDiff.gradient(logros,x)
+
+# ╔═╡ 33af7cc0-d0d1-4336-a5a0-3464f99a14ce
+begin
+function k(x1,x2)
+	h=1.0
+	return exp(-norm(x1-x2)^2/h)
+end
+end
+
+# ╔═╡ cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
+begin
+gradk(x1::T,x2) where {T<:Real}= ForwardDiff.derivative(x1->k(x1,x2),x1)
+gradk(x1::AbstractArray{T},x2) where {T<:Real} = ForwardDiff.gradient(x1->k(x1,x2),x1)
+end
+
+# ╔═╡ de554a2d-df2a-4210-a88d-8d3d7430df73
+begin
+function ϕ(xi,x)
+	n=2
+	sum=zeros(2,1)
+	for j in 1:np^2
+		sum+=k(x[j,:],xi)*gradlogros(x[j,:])+gradk(x[j,:],xi) 
+	end
+	return 1/size(x,1)*sum
+end
+end
+
 # ╔═╡ 2ac0f29b-a82a-4e87-908a-f0fcad5fb600
 function ndgrid()
 	tuples = Iterators.product(-1.:0.03:0.0, -1.:0.03:0.0, -1.:0.03:0.0,-1.:0.03:0.0)
@@ -42,8 +86,89 @@ function ndgrid()
 	return grid
 end
 
-# ╔═╡ b525fb70-0f52-4051-b664-1bd9305201bb
-gr()
+# ╔═╡ 4642310b-3a2f-4945-8cc0-9e9ace0f18d9
+function svgd()
+	ϵ= stepsize
+	x = LinRange(-1,1,np)
+	y = LinRange(-3,-2,np)	
+	xx,yy = meshgrid(x,y)
+	X = [[xx[i],yy[i]] for i in eachindex(xx)]
+	particles=reduce(hcat,X)'
+	temp=zeros(np^2,2)
+	Iterations=zeros(ni,np^2,2)
+	for j in 1:ni
+		for i in 1:np^2
+			temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles)
+		end	
+		particles=copy(temp)
+		Iterations[j,:,:]=copy(temp)
+	end
+	return Iterations
+end
+
+# ╔═╡ c5c87daf-5733-4cdf-9a69-d73a035abd3d
+function marginalization(f,n)
+	fineness=1
+	points=11
+	start=-5
+	margs=zeros(points,n)
+	if n==2
+		for j in 0:n-1
+			for i in 1:points
+				ü=start+fineness*(i-1)
+				rintx(x)=f([ü x])
+				rinty(x)=f([x ü])
+				margs[i,1]=hquadrature(rintx,-5,5)[1]
+				margs[i,2]=hquadrature(rinty,-5,5)[1]
+			end
+		end
+	else
+		for j in 0:n-1
+			for i in 1:points
+				ü=start+fineness*(i-1)
+				rint(x)=f(vcat(x[1:j],ü,x[j+1:n-1]))
+				margs[i,j+1]=hcubature(rint,[-5,-5],[5,5])[1]
+			end
+		end
+	end
+	return margs
+end
+
+# ╔═╡ 753a1dbd-d8d7-4a8a-a4c0-d895b31b7ec0
+function characteristics(Iterations,ni,np)
+	expected=zeros(ni,2)
+	variance=zeros(ni,2)
+	covariance=zeros(ni,1)
+	for j in 1:ni
+		for i in 1:np^2
+			expected[j,:]+=Iterations[j,i,:]
+		end
+		expected[j,:]=expected[j,:]/(np^2-1)
+		for i in 1:np^2
+			variance[j,:]+=(Iterations[j,i,:]-expected[j,:]).^2
+			covariance[j]+=(Iterations[j,i,1]-expected[j,1])*(Iterations[j,i,2]-expected[j,2])
+		end
+		covariance[j]=covariance[j]/(np^2-1)
+		variance[j,:]=variance[j,:]/(np^2-1)
+	end
+	return expected,variance,covariance
+end
+
+# ╔═╡ 02e46e7c-69cf-42b8-8504-02793792e396
+function pltcont(f,xlims,ylims)
+	x = xlims[1]:0.05:xlims[2]
+	y = ylims[1]:0.05:ylims[2]
+	x_grid = repeat(reshape(x, 1, :), length(y), 1)
+	y_grid = repeat(y, 1, length(x))
+	mapping_p = map(f, x_grid, y_grid)
+	cont2 = contour(x, y, mapping_p,fill =(true,cgrad(:oxy, scale=:log)))
+end
+
+# ╔═╡ 4a497a2b-4595-4dd7-9cb2-2cb349dde1a1
+md"""# Test Cases"""
+
+# ╔═╡ b1c1040c-189d-4304-83b9-50bb37440dae
+md"""This section aims to evaluate and/or reproduce certain characteristics of the SVGD algorithm. Therefore the so called Hybrid-Rosenbrock function proposed in (Pagani et al. 2020) will be used, which is advantageous because it provides an environment where every 2D-marginal has a complex dependency structure. This in turn makes it well-suited as a testing environment for performance of MCMC/inference algorithms."""
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1414,9 +1539,22 @@ version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
-# ╠═038b4f11-c95f-459a-97cf-9869e653ec04
-# ╠═76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
-# ╠═2ac0f29b-a82a-4e87-908a-f0fcad5fb600
-# ╠═b525fb70-0f52-4051-b664-1bd9305201bb
+# ╟─038b4f11-c95f-459a-97cf-9869e653ec04
+# ╟─bb6916c1-7056-44b3-a8ab-f7b03c0945b4
+# ╟─b525fb70-0f52-4051-b664-1bd9305201bb
+# ╟─76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
+# ╟─f0ab61b2-abea-4daa-838c-73d9b6513796
+# ╟─9c7c45fc-df01-48b7-a8cf-162bbdf756a6
+# ╟─d71ec419-c995-4425-8196-b5cd20d67957
+# ╟─33af7cc0-d0d1-4336-a5a0-3464f99a14ce
+# ╟─cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
+# ╟─de554a2d-df2a-4210-a88d-8d3d7430df73
+# ╟─2ac0f29b-a82a-4e87-908a-f0fcad5fb600
+# ╠═4642310b-3a2f-4945-8cc0-9e9ace0f18d9
+# ╟─c5c87daf-5733-4cdf-9a69-d73a035abd3d
+# ╟─753a1dbd-d8d7-4a8a-a4c0-d895b31b7ec0
+# ╟─02e46e7c-69cf-42b8-8504-02793792e396
+# ╟─4a497a2b-4595-4dd7-9cb2-2cb349dde1a1
+# ╟─b1c1040c-189d-4304-83b9-50bb37440dae
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
