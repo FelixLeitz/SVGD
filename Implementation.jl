@@ -6,6 +6,7 @@ using InteractiveUtils
 
 # ╔═╡ a8577720-7990-11ee-3a5e-eb35a337d22d
 begin
+	using KernelDensity
 	using Plots
 	using PlutoUI
 	using LinearAlgebra
@@ -18,7 +19,7 @@ end
 
 # ╔═╡ 75503983-557f-4926-9f2e-478d381bf731
 md"""# SVGD 
-This is a short implementation of basic **SVGD** principles for a standard rosenbrock distribution. The functions as well as the parameters can be tweaked/replaced as necessary for the task at hand.
+This is a short implementation of basic **SVGD** principles for a standard rosenbrock distribution. The functions as well as the parameters can be tweaked/replaced as necessary for the task at hand.(Gaussian/Rastrigin also provided)
 """
 
 # ╔═╡ e36d0610-c7b7-4cb4-86f4-485b7dd9bd7b
@@ -82,12 +83,12 @@ rosenbrock(x) = sqrt(0.05*5)/π*exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/
 logros(x) = log(rosenbrock(x))
 
 # ╔═╡ f2f14f9f-8bfd-4642-ac69-1db28298d8ab
-gradlogros = x -> ForwardDiff.gradient(logros,x)
+gradlogros(x) = ForwardDiff.gradient(x->logros(x),x)
 
 # ╔═╡ 331f6880-27d3-4d42-9039-98a2066a8fdf
 begin
 function k(x1,x2)
-	h=1.0
+	h=1
 	return exp(-norm(x1-x2)^2/h)
 end
 end
@@ -119,9 +120,9 @@ md"""##### Grid methods"""
 
 # ╔═╡ c6a5665e-2b18-49e9-93eb-c44a8afff73b
 function ndgrid()
-	tuples = Iterators.product(-1.:0.03:0.0, -1.:0.03:0.0, -1.:0.03:0.0,-1.:0.03:0.0)
+	tuples = Iterators.product(range(-1,1,np), range(-1,1,np))
 	tuples = vec(collect(tuples))
-	grid=zeros(length(tuples),4);
+	grid=zeros(length(tuples),2);
 	for i in 1:length(tuples)
 		grid[i,:]=[j for j in tuples[i]]
 	end
@@ -141,11 +142,12 @@ md"""##### Initialisation"""
 # ╔═╡ 8d078e0f-862a-42e0-8475-565ad512b14c
 begin
 ϵ= stepsize
-x = LinRange(-1,1,np)
-y = LinRange(-3,-2,np)	
-xx,yy = meshgrid(x,y)
-X = [[xx[i],yy[i]] for i in eachindex(xx)]
-particles=reduce(hcat,X)'
+#x = LinRange(-1,1,np)
+#y = LinRange(-3,-2,np)	
+#xx,yy = meshgrid(x,y)
+#X = [[xx[i],yy[i]] for i in eachindex(xx)]
+#particles=reduce(hcat,X)'
+particles=ndgrid()
 temp=zeros(np^2,2)
 Iterations=zeros(ni,np^2,2)
 end;
@@ -187,34 +189,91 @@ end
 end
 
 # ╔═╡ 7e13d38b-1db9-49c7-b655-60da3d266861
-l(x)=exp(-(x[1]^2+x[2]^2))
+l(x)=exp(-(x[1]^2+x[2]^2+x[3]^2+x[4]^2))
 
 # ╔═╡ e89a305d-6ce2-4fbd-bdb3-7ea79a1b57ff
 function marginalization(f,n)
-	fineness=1
-	points=11
-	start=-5
+	fineness=0.2
+	points=200
 	margs=zeros(points,n)
 	if n==2
-		for j in 0:n-1
 			for i in 1:points
-				ü=start+fineness*(i-1)
-				rintx(x)=f([ü x])
-				rinty(x)=f([x ü])
-				margs[i,1]=hquadrature(rintx,-5,5)[1]
-				margs[i,2]=hquadrature(rinty,-5,5)[1]
+				xval=-8+fineness*(i-1)
+				yval=-3+0.5fineness*(i-1)
+				rintx(x)=f([xval,x])
+				rinty(x)=f([x,yval])
+				margs[i,1]=hquadrature(rintx,-100,100)[1]
+				margs[i,2]=hquadrature(rinty,-5,10)[1]
 			end
-		end
 	else
 		for j in 0:n-1
 			for i in 1:points
-				ü=start+fineness*(i-1)
+				ü=-3+fineness*(i-1)
 				rint(x)=f(vcat(x[1:j],ü,x[j+1:n-1]))
-				margs[i,j+1]=hcubature(rint,[-5,-5],[5,5])[1]
+				margs[i,j+1]=hcubature(rint,[-5 for i in 1:n],[5 for i in 1:n])[1]
 			end
 		end
 	end
 	return margs
+end
+
+# ╔═╡ 096637c3-746f-4c37-bdcb-556f0bd55bb3
+pckest=kde(Iterations[ni,:,:])
+
+# ╔═╡ bc615b09-de96-4d02-bc4e-2037026e3297
+begin
+aa = pckest.x
+bb = pckest.x
+a_grid = repeat(reshape(aa, 1, :), length(bb), 1)
+b_grid = repeat(bb, 1, length(aa))
+end;
+
+# ╔═╡ 99aacbad-8f14-4f58-80b1-15c978689d65
+contour(bb,aa,pckest.density')
+
+# ╔═╡ 403657c1-b3c8-48f9-bc27-bc4c12bd7321
+function KDE(x)
+	n=size(temp,1)
+	dims=2
+	f_h=0
+	h=1
+	for i in 1:n
+		f_h+=1/(h*sqrt((2*pi)^dims))*exp(-norm(x-temp[i,:])/h)
+	end
+	return f_h/n
+end
+
+# ╔═╡ 3f0c058d-d355-4a8b-a633-e900afcd1fa1
+begin
+	margs=marginalization(rosenbrock,2);
+	margKDE=marginalization(KDE,2)
+	xvec=[-8+0.2i for i in 0:100]
+end;
+
+# ╔═╡ fee09141-0f47-42b5-959d-9641436512fc
+begin
+	scatter(xvec,margKDE[:,1],label="KDE")
+	scatter!(xvec,margs[:,1],label="rosenbrock")
+end
+
+# ╔═╡ 50c19afd-3194-4a84-83b6-f617f272d0a8
+begin
+	cdf=zeros(100)
+	cdfKDE=zeros(100)
+	diff=zeros(100)
+	for i in 2:100
+		cdfKDE[i]=cdfKDE[i-1]+margKDE[i,1]*0.2
+		cdf[i]=cdf[i-1]+margs[i,1]*0.2	
+	end	
+end
+
+# ╔═╡ ffcfdda4-b163-404b-8d17-22fa86090674
+begin
+	sorted=sort(temp[:,1])
+	vals=[1/np^2*i for i in 1:np^2]
+	scatter(sorted,vals,label="SVGD")
+	scatter!(xvec,cdf,label="cdf: rosenbrock")
+	scatter!(xvec,cdfKDE,label="cdf: KDE")
 end
 
 # ╔═╡ 2b7f02b2-6029-44cf-85b5-7759e8a60279
@@ -225,8 +284,8 @@ md"""from https://docs.juliaplots.org/latest/gallery/gr/generated/gr-ref022/#gr_
 
 # ╔═╡ fccf6474-aab9-471b-bf69-73ac24d306d6
 begin
-a = -5:0.05:5
-b = -1:0.05:6
+a = -10:0.05:10
+b = -1:0.05:100
 f(x, y) = begin
         rosenbrock([x,y])#p([x,y])
     end
@@ -266,7 +325,7 @@ scatter!((expected[ni,1],expected[ni,2]),legend=false,color="blue")
 end
 
 # ╔═╡ fd2bc0f5-7d55-4620-a128-e22fc69c6d66
-md"""###### Expected values at different iterations"""
+md"""###### Expected values/variances at different iterations"""
 
 # ╔═╡ 8441bb4d-8c9f-459d-9241-94378f1045b2
 begin
@@ -274,10 +333,8 @@ begin
 end
 
 # ╔═╡ 54a48193-12e9-48e2-8d33-c9f769d114c0
-begin
-	
+begin	
 	scatter(variance[:,1],label="var(X)",color="blue")
-	ylims!(0,10)
 	scatter!(variance[:,2],label="var(Y)",color="green")
 	scatter!(covariance[:],label="cov(X,Y)",color="red")
 end
@@ -289,6 +346,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DistributionsAD = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 HCubature = "19dc6840-f33b-545b-b366-655c7e3ffd49"
+KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
@@ -299,6 +357,7 @@ Distributions = "~0.25.102"
 DistributionsAD = "~0.6.53"
 ForwardDiff = "~0.10.36"
 HCubature = "~1.5.1"
+KernelDensity = "~0.6.7"
 Plots = "~1.39.0"
 PlutoUI = "~0.7.52"
 Todo = "~0.1.0"
@@ -310,7 +369,18 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "4e0e7a82b59d837f90f7f578256966cf26d959d7"
+project_hash = "39ba4a9a67575264f1e35b7522f312a34bd25d04"
+
+[[deps.AbstractFFTs]]
+deps = ["LinearAlgebra"]
+git-tree-sha1 = "d92ad398961a3ed262d8bf04a1a2b8340f915fef"
+uuid = "621f4979-c628-5d54-868e-fcf4e3e8185c"
+version = "1.5.0"
+weakdeps = ["ChainRulesCore", "Test"]
+
+    [deps.AbstractFFTs.extensions]
+    AbstractFFTsChainRulesCoreExt = "ChainRulesCore"
+    AbstractFFTsTestExt = "Test"
 
 [[deps.AbstractPlutoDingetjes]]
 deps = ["Pkg"]
@@ -334,6 +404,12 @@ version = "1.1.1"
 
 [[deps.Artifacts]]
 uuid = "56f22d72-fd6d-98f1-02f0-08ddc0907c33"
+
+[[deps.AxisAlgorithms]]
+deps = ["LinearAlgebra", "Random", "SparseArrays", "WoodburyMatrices"]
+git-tree-sha1 = "66771c8d21c8ff5e3a93379480a2307ac36863f7"
+uuid = "13072b0f-2c55-5437-9ae7-d433b7a33950"
+version = "1.0.1"
 
 [[deps.Base64]]
 uuid = "2a0f44e3-6c83-55bd-87e4-b1978d98bd5f"
@@ -560,6 +636,18 @@ git-tree-sha1 = "74faea50c1d007c85837327f6775bea60b5492dd"
 uuid = "b22a6f82-2f65-5046-a5b2-351ab43fb4e5"
 version = "4.4.2+2"
 
+[[deps.FFTW]]
+deps = ["AbstractFFTs", "FFTW_jll", "LinearAlgebra", "MKL_jll", "Preferences", "Reexport"]
+git-tree-sha1 = "b4fbdd20c889804969571cc589900803edda16b7"
+uuid = "7a1cc6ca-52ef-59f5-83cd-3a7055c09341"
+version = "1.7.1"
+
+[[deps.FFTW_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "c6033cc3892d0ef5bb9cd29b7f2f0331ea5184ea"
+uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
+version = "3.3.10+0"
+
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
@@ -708,9 +796,21 @@ git-tree-sha1 = "f550e6e32074c939295eb5ea6de31849ac2c9625"
 uuid = "83e8ac13-25f8-5344-8a64-a9f2b223428f"
 version = "0.5.1"
 
+[[deps.IntelOpenMP_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "ad37c091f7d7daf900963171600d7c1c5c3ede32"
+uuid = "1d5cc7b8-4909-519e-a0f8-d0f5ad9712d0"
+version = "2023.2.0+0"
+
 [[deps.InteractiveUtils]]
 deps = ["Markdown"]
 uuid = "b77e0a4c-d291-57a0-90e8-8db25a27a240"
+
+[[deps.Interpolations]]
+deps = ["Adapt", "AxisAlgorithms", "ChainRulesCore", "LinearAlgebra", "OffsetArrays", "Random", "Ratios", "Requires", "SharedArrays", "SparseArrays", "StaticArrays", "WoodburyMatrices"]
+git-tree-sha1 = "721ec2cf720536ad005cb38f50dbba7b02419a15"
+uuid = "a98d9a8b-a2ab-59e6-89dd-64a1c18fca59"
+version = "0.14.7"
 
 [[deps.IrrationalConstants]]
 git-tree-sha1 = "630b497eafcc20001bba38a4651b327dcfc491d2"
@@ -745,6 +845,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl"]
 git-tree-sha1 = "6f2675ef130a300a112286de91973805fcc5ffbc"
 uuid = "aacddb02-875f-59d6-b918-886e6ef4fbf8"
 version = "2.1.91+0"
+
+[[deps.KernelDensity]]
+deps = ["Distributions", "DocStringExtensions", "FFTW", "Interpolations", "StatsBase"]
+git-tree-sha1 = "90442c50e202a5cdf21a7899c66b240fdef14035"
+uuid = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
+version = "0.6.7"
 
 [[deps.LAME_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -788,6 +894,10 @@ version = "0.16.1"
     [deps.Latexify.weakdeps]
     DataFrames = "a93c6f00-e57d-5684-b7b6-d8193f3e46c0"
     SymEngine = "123dc426-2d89-5057-bbad-38513e3affd8"
+
+[[deps.LazyArtifacts]]
+deps = ["Artifacts", "Pkg"]
+uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
 
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
@@ -887,6 +997,12 @@ git-tree-sha1 = "65f28ad4b594aebe22157d6fac869786a255b7eb"
 uuid = "6c6e2e6c-3030-632d-7369-2d6c69616d65"
 version = "0.1.4"
 
+[[deps.MKL_jll]]
+deps = ["Artifacts", "IntelOpenMP_jll", "JLLWrappers", "LazyArtifacts", "Libdl", "Pkg"]
+git-tree-sha1 = "eb006abbd7041c28e0d16260e50a24f8f9104913"
+uuid = "856f044c-d86e-5d09-b602-aeab76dc8ba7"
+version = "2023.2.0+0"
+
 [[deps.MacroTools]]
 deps = ["Markdown", "Random"]
 git-tree-sha1 = "9ee1618cbf5240e6d4e0371d6f24065083f60c48"
@@ -935,6 +1051,12 @@ version = "1.0.2"
 [[deps.NetworkOptions]]
 uuid = "ca575930-c2e3-43a9-ace4-1e988b2c1908"
 version = "1.2.0"
+
+[[deps.OffsetArrays]]
+deps = ["Adapt"]
+git-tree-sha1 = "2ac17d29c523ce1cd38e27785a7d23024853a4bb"
+uuid = "6fe1bfb0-de20-5000-8ca7-80f57d26f881"
+version = "1.12.10"
 
 [[deps.Ogg_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1082,6 +1204,16 @@ uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 deps = ["SHA", "Serialization"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
+[[deps.Ratios]]
+deps = ["Requires"]
+git-tree-sha1 = "1342a47bf3260ee108163042310d26f2be5ec90b"
+uuid = "c84ed2f1-dad5-54f0-aa8e-dbefe2724439"
+version = "0.4.5"
+weakdeps = ["FixedPointNumbers"]
+
+    [deps.Ratios.extensions]
+    RatiosFixedPointNumbersExt = "FixedPointNumbers"
+
 [[deps.RealDot]]
 deps = ["LinearAlgebra"]
 git-tree-sha1 = "9f0a1b71baaf7650f4fa8a1d168c7fb6ee41f0c9"
@@ -1141,6 +1273,10 @@ version = "1.2.0"
 
 [[deps.Serialization]]
 uuid = "9e88b42a-f829-5b0c-bbe9-9e923198166b"
+
+[[deps.SharedArrays]]
+deps = ["Distributed", "Mmap", "Random", "Serialization"]
+uuid = "1a1011a3-84de-559e-8e89-a11a2f7dc383"
 
 [[deps.Showoff]]
 deps = ["Dates", "Grisu"]
@@ -1341,6 +1477,12 @@ deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
 git-tree-sha1 = "4528479aa01ee1b3b4cd0e6faef0e04cf16466da"
 uuid = "2381bf8a-dfd0-557d-9999-79630e7b1b91"
 version = "1.25.0+0"
+
+[[deps.WoodburyMatrices]]
+deps = ["LinearAlgebra", "SparseArrays"]
+git-tree-sha1 = "de67fa59e33ad156a590055375a30b23c40299d3"
+uuid = "efce3f68-66dc-5838-9240-27a6d6f5f9b6"
+version = "0.5.5"
 
 [[deps.XML2_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Libiconv_jll", "Zlib_jll"]
@@ -1639,7 +1781,7 @@ version = "1.4.1+1"
 # ╟─f2f14f9f-8bfd-4642-ac69-1db28298d8ab
 # ╟─331f6880-27d3-4d42-9039-98a2066a8fdf
 # ╟─3f5cbd17-2c3b-4149-8422-bfb6845177a0
-# ╠═f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
+# ╟─f4f8e0a8-3fb9-4350-8b56-7507fb82ca6e
 # ╟─273f06ed-4ea0-499a-9cbc-9728ff5a6d38
 # ╟─17fecc47-6328-4e40-8cd7-08aa15aa6e1e
 # ╟─c6a5665e-2b18-49e9-93eb-c44a8afff73b
@@ -1650,8 +1792,16 @@ version = "1.4.1+1"
 # ╠═81d75374-db13-465d-9fd5-ca5efab645e2
 # ╟─b525d418-5ea7-460d-ad6a-39866ff9a828
 # ╠═78d7f3c8-cd1b-45f1-8260-4011949f4cc1
-# ╠═7e13d38b-1db9-49c7-b655-60da3d266861
+# ╟─7e13d38b-1db9-49c7-b655-60da3d266861
 # ╠═e89a305d-6ce2-4fbd-bdb3-7ea79a1b57ff
+# ╠═3f0c058d-d355-4a8b-a633-e900afcd1fa1
+# ╠═fee09141-0f47-42b5-959d-9641436512fc
+# ╠═50c19afd-3194-4a84-83b6-f617f272d0a8
+# ╠═ffcfdda4-b163-404b-8d17-22fa86090674
+# ╠═096637c3-746f-4c37-bdcb-556f0bd55bb3
+# ╠═bc615b09-de96-4d02-bc4e-2037026e3297
+# ╠═99aacbad-8f14-4f58-80b1-15c978689d65
+# ╠═403657c1-b3c8-48f9-bc27-bc4c12bd7321
 # ╟─2b7f02b2-6029-44cf-85b5-7759e8a60279
 # ╟─bf8490fc-d21f-4fb7-8c87-6d6727cbaf7e
 # ╠═fccf6474-aab9-471b-bf69-73ac24d306d6
