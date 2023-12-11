@@ -12,7 +12,8 @@ begin
 	using DistributionsAD
 	using Todo
 	using ForwardDiff
-	using HCubature
+	using Cubature
+	using QuadGK
 	using KernelDensity
 end
 
@@ -21,69 +22,6 @@ md"""### Underlying framework"""
 
 # ╔═╡ b525fb70-0f52-4051-b664-1bd9305201bb
 gr()
-
-# ╔═╡ 76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
-function hybrid_rosenbrock(x)
-	n1=3
-	n2=1
-	a=0.05
-	b=5
-	μ=1
-	sum=a*(x[1]-μ)^2
-	c=2
-	n=(n1-1)*n2+1
-	normalization=(sqrt(a)*sqrt(b)^(n-1))/(π^n)
-	for j in 1:n2
-		sum+=b*(x[c]-x[1]^2)^2
-		c+=1
-		for i in 3:n1
-			sum+=b*(x[c]-x[c-1]^2)^2
-			c+=1
-		end
-	end
-	return normalization*exp(-sum)
-end
-
-# ╔═╡ 5a8f2fea-3bd1-4a8a-b377-5beb1deb1178
-loghybros(x)=log(hybrid_rosenbrock(x))
-
-# ╔═╡ 1d315a90-7d14-4695-b603-001337c50b3b
-gradloghybros(x)=ForwardDiff.gradient(x->loghybros(x),x)
-
-# ╔═╡ 01319df2-fcab-49f6-98ca-c43b4cc89914
-gradloghybros([1 0 1])
-
-# ╔═╡ f0ab61b2-abea-4daa-838c-73d9b6513796
-begin
-	rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
-	rosenbrock(x,y)= exp(-((1.0 - x)^2 + 100 * (y - x^2)^2)/20)
-end
-
-# ╔═╡ 9c7c45fc-df01-48b7-a8cf-162bbdf756a6
-logros(x) = log(rosenbrock(x))
-
-# ╔═╡ d71ec419-c995-4425-8196-b5cd20d67957
-gradlogros(x) = ForwardDiff.gradient(x->logros(x),x)
-
-# ╔═╡ 33af7cc0-d0d1-4336-a5a0-3464f99a14ce
-begin
-function k(x1,x2)
-	h=1.0
-	return exp(-norm(x1-x2)^2/h)
-end
-end
-
-# ╔═╡ cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
-begin
-gradk(x1::T,x2) where {T<:Real}= ForwardDiff.derivative(x1->k(x1,x2),x1)
-gradk(x1::AbstractArray{T},x2) where {T<:Real} = ForwardDiff.gradient(x1->k(x1,x2),x1)
-end
-
-# ╔═╡ 2390b9af-2985-4466-b136-48f12c9af27b
-np=2
-
-# ╔═╡ a1213deb-dfe6-4086-9d6f-1a7bfe05b1b5
-dims=3
 
 # ╔═╡ d202a8e8-f5f7-4465-bd00-af54a86eeb1d
 begin
@@ -107,44 +45,112 @@ gradloggauss(x::T) where{T<:Real} = ForwardDiff.derivative(x->loggauss(x),x)
 gradloggauss(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->loggauss(x),x)
 end
 
+# ╔═╡ 76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
+function hybrid_rosenbrock(x)
+	n1=3
+	n2=2
+	a=0.05
+	b=5
+	μ=1
+	sum=a*(x[1]-μ)^2
+	c=2
+	n=(n1-1)*n2+1
+	normalization=(sqrt(a)*sqrt(b)^(n-1))/(π^n)
+	for j in 1:n2
+		sum+=b*(x[c]-x[1]^2)^2
+		c+=1
+		for i in 3:n1
+			sum+=b*(x[c]-x[c-1]^2)^2
+			c+=1	
+		end
+	end
+	return normalization*exp(-sum)
+end
+
+# ╔═╡ 5a8f2fea-3bd1-4a8a-b377-5beb1deb1178
+loghybros(x)=log(hybrid_rosenbrock(x))
+
+# ╔═╡ 1d315a90-7d14-4695-b603-001337c50b3b
+gradloghybros(x)=ForwardDiff.gradient(x->loghybros(x),x)
+
+# ╔═╡ f0ab61b2-abea-4daa-838c-73d9b6513796
+begin
+	rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
+	rosenbrock(x,y)= exp(-((1.0 - x)^2 + 100 * (y - x^2)^2)/20)
+end
+
+# ╔═╡ 9c7c45fc-df01-48b7-a8cf-162bbdf756a6
+logros(x) = log(rosenbrock(x))
+
+# ╔═╡ d71ec419-c995-4425-8196-b5cd20d67957
+gradlogros(x) = ForwardDiff.gradient(x->logros(x),x)
+
+# ╔═╡ 33af7cc0-d0d1-4336-a5a0-3464f99a14ce
+begin
+function k(x1,x2)
+	h=1
+	return exp(-norm(x1-x2)^2/h)
+end
+end
+
+# ╔═╡ cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
+begin
+gradk(x1::T,x2) where {T<:Real}= ForwardDiff.derivative(x1->k(x1,x2),x1)
+gradk(x1::AbstractArray{T},x2) where {T<:Real} = ForwardDiff.gradient(x1->k(x1,x2),x1)
+end
+
 # ╔═╡ de554a2d-df2a-4210-a88d-8d3d7430df73
 begin
-function ϕ(xi,x)
+function ϕ(xi,x,np,dims,update,kernel,gradkernel)
 	n=dims
 	sum=zeros(n,1)
-	for j in 1:np^dims
-		sum+=k(x[j,:],xi)*gradloghybros(x[j,:])+gradk(x[j,:],xi) 
+	for j in 1:np
+		sum+=kernel(x[j,:],xi)*update(x[j,:])+gradkernel(x[j,:],xi) 
 	end
 	return 1/size(x,1)*sum
 end
 end
 
-# ╔═╡ cfdb7a59-0940-47cd-b579-59a1b968f7f9
-ni=100
-
-# ╔═╡ 1531def9-c017-4416-9ae2-35a43c9c1cdc
-stepsize=.1
-
-# ╔═╡ 2ac0f29b-a82a-4e87-908a-f0fcad5fb600
-function ndgrid()
-	tuples = Iterators.product(range(-1,0,np), range(-1,-0.5,np),range(-1,2,np))
-	tuples = vec(collect(tuples))
-	grid=zeros(length(tuples),dims);
-	for i in 1:length(tuples)
-		grid[i,:]=[j for j in tuples[i]]
+# ╔═╡ c16badd0-8814-4508-8d17-24e36afbd669
+function npoints(n,dims)
+	grid=collect(range(-1,1,n))
+	for i in 2:dims
+		grid=hcat(grid,range(-0,1,n))
 	end
 	return grid
 end
 
+# ╔═╡ 2258b223-dcd5-4b4d-a174-1d560bf9b28a
+npoints(10,5)
+
+# ╔═╡ 2ac0f29b-a82a-4e87-908a-f0fcad5fb600
+function ndpoints(n,dims)
+	tuples = Iterators.product(range(-1,1,n[1]),range(-1,1,n[2]))
+	tuples = vec(collect(tuples))
+	grid=zeros(length(tuples),2);
+	for i in 1:length(tuples)
+		grid[i,:]=[j for j in tuples[i]]
+	end
+	for i in 3:dims
+		grid=hcat(grid,range(-0,1,n[1]*n[2]))
+	end
+	return grid
+end
+
+# ╔═╡ 7a604399-19ca-4276-965a-01b90c774232
+ndpoints([5,2],2)
+
 # ╔═╡ 4642310b-3a2f-4945-8cc0-9e9ace0f18d9
-function svgd()
-	ϵ= stepsize
-	particles=ndgrid()
-	temp=zeros(np^dims,dims)
-	Iterations=zeros(ni,np^dims,dims)
+function svgd(np,dims,ni,stepsize,update,kernel)
+	ϵ=stepsize
+	gradkernel(x1,x2)=ForwardDiff.gradient(x1->kernel(x1,x2),x1)
+	#np=points[1]*points[2]
+	particles=npoints(np,dims)
+	temp=zeros(np,dims)
+	Iterations=zeros(ni,np,dims)
 	for j in 1:ni
-		for i in 1:np^dims
-			temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles)
+		for i in 1:np
+			temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles,np,dims,update,kernel,gradkernel)
 		end	
 		particles=copy(temp)
 		Iterations[j,:,:]=copy(temp)
@@ -152,147 +158,27 @@ function svgd()
 	return Iterations
 end
 
-# ╔═╡ f586ac02-e826-460c-a428-64b8e7ecc798
-result=svgd()[ni,:,:]
-
-# ╔═╡ 931492bc-496f-472d-b3af-90bc975dd44e
-function KDE(x)
-	n=size(result,1)
-	dims=3
-	f_h=0
-	h=1
-	for i in 1:n
-		f_h+=1/(h*sqrt((2*pi)^dims))*exp(-norm(x-result[i,:])/h)
-	end
-	return f_h/n
-end
-
-# ╔═╡ e616cbfc-534f-4288-bd1a-106715bfddcb
-b_range = range(-5, 5, length=20)
-
-# ╔═╡ d499f8bd-a17b-4c12-8a56-ccc634e5c67a
-histogram(result[:,1],bins=b_range)
-
-# ╔═╡ c5c87daf-5733-4cdf-9a69-d73a035abd3d
-function marginalization(f,n)
-	fineness=0.05
-	points=100
-	start=-3
-	margs=zeros(points,n)
-	if n==2
-		for i in 1:points
-			evalat=start+fineness*(i-1)
-			rintx(x)=f([evalat x])
-			rinty(x)=f([x evalat])
-			margs[i,1]=hquadrature(rintx,-1,100)[1]
-			margs[i,2]=hquadrature(rinty,-5,5)[1]
-		end
-	else
-		for j in 0:n-1
-			for i in 1:points
-				evalat=start+fineness*(i-1)
-				rint(x)=f(vcat(x[1:j],evalat,x[j+1:n-1]))
-				margs[i,j+1]=hcubature(rint,[-10,-1],[10,1])[1]
-			end
-		end
-	end
-	return margs
-end
-
-# ╔═╡ 830c59d4-7a63-44b0-82da-4aa6f6b0cf2b
-begin
-j=0
-p=[1 2]
-	eva=4
-vcat(p[1:j],eva,p[j+1:3-1])
-end
-
-# ╔═╡ 753a1dbd-d8d7-4a8a-a4c0-d895b31b7ec0
-function characteristics(Iterations,ni,np)
-	expected=zeros(ni,2)
-	variance=zeros(ni,2)
-	covariance=zeros(ni,1)
-	for j in 1:ni
-		for i in 1:np^2
-			expected[j,:]+=Iterations[j,i,:]
-		end
-		expected[j,:]=expected[j,:]/(np^2-1)
-		for i in 1:np^2
-			variance[j,:]+=(Iterations[j,i,:]-expected[j,:]).^2
-			covariance[j]+=(Iterations[j,i,1]-expected[j,1])*(Iterations[j,i,2]-expected[j,2])
-		end
-		covariance[j]=covariance[j]/(np^2-1)
-		variance[j,:]=variance[j,:]/(np^2-1)
-	end
-	return expected,variance,covariance
-end
-
-# ╔═╡ 02e46e7c-69cf-42b8-8504-02793792e396
-function pltcont(f,xlims,ylims)
-	x = xlims[1]:0.05:xlims[2]
-	y = ylims[1]:0.05:ylims[2]
-	x_grid = repeat(reshape(x, 1, :), length(y), 1)
-	y_grid = repeat(y, 1, length(x))
-	mapping_p = map(f, x_grid, y_grid)
-	cont2 = contour(x, y, mapping_p,fill =(true,cgrad(:oxy, scale=:log)))
-end
-
-# ╔═╡ 606b3d4b-5981-4fef-9067-431ded5fbca8
-Plots.gr()
-
-# ╔═╡ e5a68a00-86f0-43fc-a6e8-d9c010b59af9
-# ╠═╡ disabled = true
-#=╠═╡
-begin
-a = -3:0.05:3
-b = -1:0.05:7
-f(x, y) = begin
-        hybrid_rosenbrock([x y])
-    end
-x_grid = repeat(reshape(a, 1, :), length(b), 1)
-y_grid = repeat(b, 1, length(a))
-mapping_p = map(f, x_grid, y_grid)
-cont1 = contour(a, b, mapping_p, fill = true)
-cont2 = contour(a, b, mapping_p,fill =(true,cgrad(:oxy, scale=:log)))
-end;
-  ╠═╡ =#
-
-# ╔═╡ 4bfcbb78-1b79-43b6-90a5-959f0e1c7997
-m=marginalization(hybrid_rosenbrock,3)
-
-# ╔═╡ 2ad8a624-9cb5-40d2-b0a1-6bc240280ce3
-scatter(m[:,1])
-
-# ╔═╡ c09dcec6-8bed-4010-b529-7084d033daac
-#=╠═╡
-plot(cont2)
-  ╠═╡ =#
-
-# ╔═╡ 4a497a2b-4595-4dd7-9cb2-2cb349dde1a1
-md"""# Test Cases"""
-
-# ╔═╡ b1c1040c-189d-4304-83b9-50bb37440dae
-md"""This section aims to evaluate and/or reproduce certain characteristics of the SVGD algorithm. Therefore the so called Hybrid-Rosenbrock function proposed in (Pagani et al. 2020) will be used, which is advantageous because it provides an environment where every 2D-marginal has a complex dependency structure. This in turn makes it well-suited as a testing environment for performance of MCMC/inference algorithms."""
-
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
+Cubature = "667455a9-e2ce-5579-9412-b964f529a492"
 DistributionsAD = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
-HCubature = "19dc6840-f33b-545b-b366-655c7e3ffd49"
 KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
+QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
 Todo = "b28a226c-6cff-11e9-1336-699fd753ab00"
 
 [compat]
+Cubature = "~1.5.1"
 DistributionsAD = "~0.6.53"
 ForwardDiff = "~0.10.36"
-HCubature = "~1.5.1"
 KernelDensity = "~0.6.7"
 Plots = "~1.39.0"
 PlutoUI = "~0.7.54"
+QuadGK = "~2.9.1"
 Todo = "~0.1.0"
 """
 
@@ -302,7 +188,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "cb8b791699e15b7ca473da015785a182995ab36c"
+project_hash = "326eb3f701548f6eeb2f625ab1c135af4d6d2c82"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -420,11 +306,6 @@ git-tree-sha1 = "fc08e5930ee9a4e03f84bfb5211cb54e7769758a"
 uuid = "5ae59095-9a9b-59fe-a467-6f913c188581"
 version = "0.12.10"
 
-[[deps.Combinatorics]]
-git-tree-sha1 = "08c8b6831dc00bfea825826be0bc8336fc369860"
-uuid = "861a8166-3701-5b0c-9a16-15d98fcdc6aa"
-version = "1.0.2"
-
 [[deps.CommonSubexpressions]]
 deps = ["MacroTools", "Test"]
 git-tree-sha1 = "7b8a93dba8af7e3b42fecabf646260105ac373f7"
@@ -470,6 +351,18 @@ version = "1.5.4"
 git-tree-sha1 = "d05d9e7b7aedff4e5b51a029dced05cfb6125781"
 uuid = "d38c429a-6771-53c6-b99e-75d170b6e991"
 version = "0.6.2"
+
+[[deps.Cubature]]
+deps = ["Cubature_jll"]
+git-tree-sha1 = "c3f4b3b38abd7b5c3ccf59adab2568212e7530d3"
+uuid = "667455a9-e2ce-5579-9412-b964f529a492"
+version = "1.5.1"
+
+[[deps.Cubature_jll]]
+deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
+git-tree-sha1 = "0fe9efb84e3eb7b14f885a95aaa0ed50c7e839c8"
+uuid = "7bc98958-0e37-5d67-a6ac-a3a19030071a"
+version = "1.0.5+0"
 
 [[deps.DataAPI]]
 git-tree-sha1 = "8da84edb865b0b5b0100c0666a9bc9a0b71c553c"
@@ -707,12 +600,6 @@ version = "1.3.14+0"
 git-tree-sha1 = "53bb909d1151e57e2484c3d1b53e19552b887fb2"
 uuid = "42e2da0e-8278-4e71-bc24-59509adca0fe"
 version = "1.0.2"
-
-[[deps.HCubature]]
-deps = ["Combinatorics", "DataStructures", "LinearAlgebra", "QuadGK", "StaticArrays"]
-git-tree-sha1 = "e95b36755023def6ebc3d269e6483efa8b2f7f65"
-uuid = "19dc6840-f33b-545b-b366-655c7e3ffd49"
-version = "1.5.1"
 
 [[deps.HTTP]]
 deps = ["Base64", "CodecZlib", "ConcurrentUtilities", "Dates", "ExceptionUnwrapping", "Logging", "LoggingExtras", "MbedTLS", "NetworkOptions", "OpenSSL", "Random", "SimpleBufferStream", "Sockets", "URIs", "UUIDs"]
@@ -1747,39 +1634,22 @@ version = "1.4.1+1"
 # ╠═038b4f11-c95f-459a-97cf-9869e653ec04
 # ╟─bb6916c1-7056-44b3-a8ab-f7b03c0945b4
 # ╟─b525fb70-0f52-4051-b664-1bd9305201bb
-# ╠═d202a8e8-f5f7-4465-bd00-af54a86eeb1d
+# ╟─d202a8e8-f5f7-4465-bd00-af54a86eeb1d
 # ╟─3a1a79da-7cf9-4fc2-9f76-13e57eddfe08
 # ╟─79bcf510-d55b-4dbe-8303-f87455ba3abd
-# ╟─76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
+# ╠═76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
 # ╟─5a8f2fea-3bd1-4a8a-b377-5beb1deb1178
 # ╟─1d315a90-7d14-4695-b603-001337c50b3b
-# ╠═01319df2-fcab-49f6-98ca-c43b4cc89914
 # ╟─f0ab61b2-abea-4daa-838c-73d9b6513796
 # ╟─9c7c45fc-df01-48b7-a8cf-162bbdf756a6
 # ╟─d71ec419-c995-4425-8196-b5cd20d67957
-# ╟─33af7cc0-d0d1-4336-a5a0-3464f99a14ce
-# ╟─cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
+# ╠═33af7cc0-d0d1-4336-a5a0-3464f99a14ce
+# ╠═cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
 # ╠═de554a2d-df2a-4210-a88d-8d3d7430df73
-# ╠═2390b9af-2985-4466-b136-48f12c9af27b
-# ╠═a1213deb-dfe6-4086-9d6f-1a7bfe05b1b5
-# ╠═cfdb7a59-0940-47cd-b579-59a1b968f7f9
-# ╠═1531def9-c017-4416-9ae2-35a43c9c1cdc
-# ╟─2ac0f29b-a82a-4e87-908a-f0fcad5fb600
-# ╟─4642310b-3a2f-4945-8cc0-9e9ace0f18d9
-# ╟─931492bc-496f-472d-b3af-90bc975dd44e
-# ╠═f586ac02-e826-460c-a428-64b8e7ecc798
-# ╟─e616cbfc-534f-4288-bd1a-106715bfddcb
-# ╠═d499f8bd-a17b-4c12-8a56-ccc634e5c67a
-# ╠═c5c87daf-5733-4cdf-9a69-d73a035abd3d
-# ╠═830c59d4-7a63-44b0-82da-4aa6f6b0cf2b
-# ╟─753a1dbd-d8d7-4a8a-a4c0-d895b31b7ec0
-# ╟─02e46e7c-69cf-42b8-8504-02793792e396
-# ╠═606b3d4b-5981-4fef-9067-431ded5fbca8
-# ╟─e5a68a00-86f0-43fc-a6e8-d9c010b59af9
-# ╠═4bfcbb78-1b79-43b6-90a5-959f0e1c7997
-# ╠═2ad8a624-9cb5-40d2-b0a1-6bc240280ce3
-# ╠═c09dcec6-8bed-4010-b529-7084d033daac
-# ╟─4a497a2b-4595-4dd7-9cb2-2cb349dde1a1
-# ╟─b1c1040c-189d-4304-83b9-50bb37440dae
+# ╠═c16badd0-8814-4508-8d17-24e36afbd669
+# ╠═2258b223-dcd5-4b4d-a174-1d560bf9b28a
+# ╠═2ac0f29b-a82a-4e87-908a-f0fcad5fb600
+# ╠═7a604399-19ca-4276-965a-01b90c774232
+# ╠═4642310b-3a2f-4945-8cc0-9e9ace0f18d9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
