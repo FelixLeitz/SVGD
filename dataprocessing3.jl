@@ -4,7 +4,7 @@
 using Markdown
 using InteractiveUtils
 
-# ╔═╡ a865b380-96d2-11ee-325d-0fde23722243
+# ╔═╡ 51e9cfe0-984f-11ee-1ea8-6dd56acb9377
 begin
 	using FileIO
 	using JLD2
@@ -14,90 +14,25 @@ begin
 	using Distributions
 end
 
-# ╔═╡ 28df78f4-abc4-49fd-9c18-9793aa6296e3
-@load "test_v01_3-57D_32_10000_.1.jld2" ergebnis
+# ╔═╡ ed4e54b7-f2f5-4ef0-891b-a15b303acbe3
+@load "test_v01_17D_32_10000_.1_.2-2.jld2" ergebnis
 
-# ╔═╡ 6b36157f-536c-4f7e-838e-49d022da6bc2
+# ╔═╡ e1c7fb7c-8071-40b0-b87f-bd48e13c8805
 begin
-	means=zeros(10,57)
-	variances=zeros(10,57)
+	means=zeros(10,17)
+	variances=zeros(10,17)
 end;
 
-# ╔═╡ b599eb5b-b7ac-446b-9e68-feb933f9371c
-begin
-	histogram(ergebnis[:,10,56],bins=10)
-end
-
-# ╔═╡ aa5d5f3e-3ffd-4a32-a7e5-315f9462aaef
+# ╔═╡ a0339d7d-43f3-499e-9bbf-52abb60841e4
 for i in 1:10
-	for j in 1:57
+	for j in 1:17
 		means[i,j]=mean(ergebnis[:,i,j])
 		variances[i,j]=std(ergebnis[:,i,j])^2
 	end
 end
 
-# ╔═╡ f736148f-763e-4a41-897c-6ae7aa3b4fd1
-md"""Monte-Carlo-Integration"""
-
-# ╔═╡ bd95ddcb-1be3-4176-803d-50b876eafee6
-l(x)=sqrt(0.05*5^2)/pi^(3/2)*(exp(-(0.05*(x[1]-1)^2+5*(x[2]-x[1]^2)^2+5*(x[3]-x[2]^2)^2)))
-
-# ╔═╡ 1e14bed5-aced-4581-a6bb-16b6fea3d682
-po=291
-
-# ╔═╡ 672e0f1f-affb-455c-9cff-ca7b75dd87bd
-begin
-values=zeros(po)
-nop=1000000
-x=30*rand(nop).-15
-y=-1:0.1:28
-z=1000*rand(nop).-100
-for i in 1:po
-	for j in 1:nop
-		values[i]+=l([x[j],y[i],z[j]])
-	end
-end
-
-end
-
-# ╔═╡ ab40e716-cdb3-46c3-b682-8f6eb79672aa
-begin
-	cdf=zeros(po)
-	for i in 2:po
-		cdf[i]=cdf[i-1]+values[i]
-	end
-	cdf[po]
-end
-
-# ╔═╡ 3f2f8b56-71b2-4082-aac2-f47baafce876
-begin
-	meane=0
-	for i in 1:po
-		meane+=(-1+(i-1)*.1)*values[i]/cdf[po]*0.1
-	end
-	meane
-end
-
-# ╔═╡ 36ac0ea4-5939-472d-ab6b-0c9675e0e0bf
-begin
-	variance_monte_carlo=0
-	for i in 1:po
-		variance_monte_carlo+=(-1+(i-1)*.1-meane)^2*values[i]/cdf[po]*.1
-	end
-	variance_monte_carlo
-end
-
-# ╔═╡ 37b3eae0-0c10-4758-8d84-858ff49aca98
-begin
-scatter([3+6*i for i in 0:9],variances[:,2],xlabel="dimensions",ylabel="variance",label="SVGD",ylims=(0,10),legend=false)
-plot!([3+6*i for i in 0:9],fill(variance_monte_carlo,10),label="Monte Carlo variance")
-end
-
-# ╔═╡ d679ee37-d390-4c40-87b6-3629149135c8
-begin
-	scatter([-1+.1i for i in 0:291],values/cdf[po])
-	histogram!()
-end
+# ╔═╡ ebc4a46c-2a2b-4c3d-9f08-ccd1a2543873
+scatter([0.2*i for i in 1:10],variances[:,2],xlabel="bandwith",ylabel="variance",title="variance, 17-D hybrid-rosenbrock")
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -1322,19 +1257,10 @@ version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
-# ╠═a865b380-96d2-11ee-325d-0fde23722243
-# ╠═28df78f4-abc4-49fd-9c18-9793aa6296e3
-# ╠═6b36157f-536c-4f7e-838e-49d022da6bc2
-# ╠═b599eb5b-b7ac-446b-9e68-feb933f9371c
-# ╠═aa5d5f3e-3ffd-4a32-a7e5-315f9462aaef
-# ╠═37b3eae0-0c10-4758-8d84-858ff49aca98
-# ╟─f736148f-763e-4a41-897c-6ae7aa3b4fd1
-# ╠═bd95ddcb-1be3-4176-803d-50b876eafee6
-# ╠═1e14bed5-aced-4581-a6bb-16b6fea3d682
-# ╠═672e0f1f-affb-455c-9cff-ca7b75dd87bd
-# ╠═ab40e716-cdb3-46c3-b682-8f6eb79672aa
-# ╠═3f2f8b56-71b2-4082-aac2-f47baafce876
-# ╠═36ac0ea4-5939-472d-ab6b-0c9675e0e0bf
-# ╠═d679ee37-d390-4c40-87b6-3629149135c8
+# ╠═51e9cfe0-984f-11ee-1ea8-6dd56acb9377
+# ╠═ed4e54b7-f2f5-4ef0-891b-a15b303acbe3
+# ╠═e1c7fb7c-8071-40b0-b87f-bd48e13c8805
+# ╠═a0339d7d-43f3-499e-9bbf-52abb60841e4
+# ╠═ebc4a46c-2a2b-4c3d-9f08-ccd1a2543873
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

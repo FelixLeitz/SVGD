@@ -26,13 +26,13 @@ include("C:\\Users\\felix\\Documents\\SVGD\\rosenbrock_tests.jl")
 iterations=1
 
 # ╔═╡ 8bef32ba-cea4-4d86-9c38-6337f893eec0
-result=zeros(100,10,33);
+result=zeros(32,10,17);
 
 # ╔═╡ 1c04c294-29a8-407e-bf5a-71769b4cdc67
 for i in 1:10	
 	function f(x)
 	n1=3
-	n2=16
+	n2=8
 	a=0.05
 	b=5
 	μ=1
@@ -51,12 +51,12 @@ for i in 1:10
 		return normalization*exp(-sum)
 	end
 	function kernel(x1,x2)
-		h=1
+		h=0.2*i
 		return exp(-norm(x1-x2)^2/h)
 	end
 	logf(x)=log(f(x))s
  	gradlogf(x)=ForwardDiff.gradient(x->f(x),x)
-	result[1:10*i,i,:]=svgd(10*i,33,iterations,.1,gradlogf,kernel)[iterations,:,:];
+	result[:,i,:]=svgd(32,17,iterations,.1,gradlogf,kernel)[iterations,:,:];
 end
 
 # ╔═╡ c89c947e-e620-4e14-af77-d662acb80641
@@ -1568,6 +1568,5 @@ version = "1.4.1+1"
 # ╠═8bef32ba-cea4-4d86-9c38-6337f893eec0
 # ╠═1c04c294-29a8-407e-bf5a-71769b4cdc67
 # ╠═c89c947e-e620-4e14-af77-d662acb80641
-# ╠═1a3bbf9a-c192-4018-8ff1-c37a7969aef9
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002

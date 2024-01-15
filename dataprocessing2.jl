@@ -17,17 +17,11 @@ end
 # ╔═╡ cb267b7d-9607-4517-819a-4fd05718deb0
 @load "test_v01_33D_10-100_10000_.1.jld2" ergebnis
 
-# ╔═╡ f97df801-f5bb-45ac-8b53-90762e01eca0
-ergebnis
-
-# ╔═╡ 3a83969f-a1a2-4cc1-8982-e40aabe98c9f
-size(ergebnis[1:10,1,33])
-
 # ╔═╡ 1ea94954-b3c5-47de-8d5f-c60f44f5a601
 begin
 	means=zeros(10,33)
 	variances=zeros(10,33)
-end
+end;
 
 # ╔═╡ 00daa944-1724-41b8-a202-843c1c94984f
 for i in 1:10
@@ -1265,8 +1259,6 @@ version = "1.4.1+1"
 # ╔═╡ Cell order:
 # ╠═9a901fa0-9792-11ee-215e-253a1f4aa9d4
 # ╠═cb267b7d-9607-4517-819a-4fd05718deb0
-# ╠═f97df801-f5bb-45ac-8b53-90762e01eca0
-# ╠═3a83969f-a1a2-4cc1-8982-e40aabe98c9f
 # ╠═1ea94954-b3c5-47de-8d5f-c60f44f5a601
 # ╠═00daa944-1724-41b8-a202-843c1c94984f
 # ╠═33b89886-2586-4fe2-8420-b95f86bcf40a
