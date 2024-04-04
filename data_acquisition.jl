@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.29
+# v0.19.38
 
 using Markdown
 using InteractiveUtils
@@ -8,28 +8,39 @@ using InteractiveUtils
 begin
 	using Plots
 	using PlutoUI
+	using Statistics 
 	using LinearAlgebra
 	using DistributionsAD
 	using Todo
 	using ForwardDiff
 	using Cubature
 	using QuadGK
+	using Random
 	using KernelDensity
 	using JLD2
 	using FileIO
 end
 
 # ╔═╡ 4cf06690-18f8-4af5-910d-7f2c90ca5efa
-include("C:\\Users\\felix\\Documents\\SVGD\\rosenbrock_tests.jl")
+include("C:\\Users\\felix\\Documents\\SVGD\\stein_variational_gradient_descent.jl")
+
+# ╔═╡ b33d138b-193a-4973-a891-8d9115405de7
+md"""# Data Acquistion"""
+
+# ╔═╡ 22e1ee0d-5b09-44c9-ae1f-14c541088480
+gr()
+
+# ╔═╡ 68e27187-c208-42b8-b16d-02fd90071b23
+md"""###### Aquire testing data for comparisons easily via specifying the probability density function, the kernel and the amount of iterations. Use JLD2 to save test data for further evaluation purposes"""
 
 # ╔═╡ 8a0ce441-bab1-4f65-9add-84cf44b8e80a
-iterations=1
+iterations=100
 
 # ╔═╡ 8bef32ba-cea4-4d86-9c38-6337f893eec0
-result=zeros(32,10,17);
+result=zeros(32,20,17);
 
 # ╔═╡ 1c04c294-29a8-407e-bf5a-71769b4cdc67
-for i in 1:10	
+for i in 1:20	
 	function f(x)
 	n1=3
 	n2=8
@@ -51,26 +62,29 @@ for i in 1:10
 		return normalization*exp(-sum)
 	end
 	function kernel(x1,x2)
-		h=0.2*i
-		return exp(-norm(x1-x2)^2/h)
+		h=0.5*i
+		return exp(-norm(x1-x2)^2*h)
 	end
-	logf(x)=log(f(x))s
- 	gradlogf(x)=ForwardDiff.gradient(x->f(x),x)
-	result[:,i,:]=svgd(32,17,iterations,.1,gradlogf,kernel)[iterations,:,:];
+	grad_kernel(x1,x2)=ForwardDiff.gradient(x1->kernel(x1,x2),x1)
+	logf(x)=log(f(x))
+ 	gradlogf(x)=ForwardDiff.gradient(x->logf(x),x)
+	result[:,i,:]=svgd(32,17,iterations,.05,gradlogf,kernel,grad_kernel)[iterations,:,:];
 end
 
-# ╔═╡ c89c947e-e620-4e14-af77-d662acb80641
+# ╔═╡ cbec0ed9-af2e-4b56-915e-3b3034eca79a
+#jldsave("test.jld2"; ergebnis=result)
+
+# ╔═╡ 48a25de6-a96a-476e-ab67-a58b881a57b4
+histogram(result[:,20,9])
+
+# ╔═╡ 0e844578-ac8d-4dde-989e-9b0d624d5ec3
 begin
-his1=histogram(result[:,10,1],bins=10,legend=false)
-his2=histogram(result[:,10,2],bins=10,legend=false)
-his3=histogram(result[:,10,3],bins=10,legend=false)
-his4=histogram(result[:,5,1],bins=10,legend=false)
-his5=histogram(result[:,5,2],bins=10,legend=false)
-his6=histogram(result[:,5,3],bins=10,legend=false)
-his7=histogram(result[:,1,1],bins=10,legend=false)
-his8=histogram(result[:,1,2],bins=10,legend=false)
-his9=histogram(result[:,1,3],bins=10,legend=false)
-p = plot(his7,his8,his9,his4,his5,his6,his1,his2,his3,layout=@layout([° ° °; ° ° °; ° ° °]))
+function example_joni(x)
+	return -2*x.^3+4x.^2-x+1/4*randn(size(x))
+end
+	x_values=collect(range(-.5,2,201))
+	f_values=example_joni(x_values)
+		scatter(x_values,f_values,legend=false,title = "-x^3+ 4x^2-x+ϵ",xlabel="x",ylabel="f(x)")
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
@@ -86,6 +100,8 @@ LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Plots = "91a5bcdd-55d7-5caf-9e0b-520d859cae80"
 PlutoUI = "7f904dfe-b85e-4ff6-b463-dae2292396a8"
 QuadGK = "1fd47b50-473d-5c70-9696-f719f8f3bcdc"
+Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
+Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
 Todo = "b28a226c-6cff-11e9-1336-699fd753ab00"
 
 [compat]
@@ -107,7 +123,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "8074ad0e1737bc74cb3aa92e90416e7bc6167245"
+project_hash = "3dc5abc64e8c75cdde3c7250ba8b5918c3c6f97d"
 
 [[deps.AbstractFFTs]]
 deps = ["LinearAlgebra"]
@@ -1562,11 +1578,16 @@ version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
+# ╟─b33d138b-193a-4973-a891-8d9115405de7
 # ╠═f8ca5262-935b-11ee-1f87-4b3be7e04073
+# ╟─22e1ee0d-5b09-44c9-ae1f-14c541088480
+# ╟─68e27187-c208-42b8-b16d-02fd90071b23
 # ╠═4cf06690-18f8-4af5-910d-7f2c90ca5efa
 # ╠═8a0ce441-bab1-4f65-9add-84cf44b8e80a
 # ╠═8bef32ba-cea4-4d86-9c38-6337f893eec0
 # ╠═1c04c294-29a8-407e-bf5a-71769b4cdc67
-# ╠═c89c947e-e620-4e14-af77-d662acb80641
+# ╠═cbec0ed9-af2e-4b56-915e-3b3034eca79a
+# ╠═48a25de6-a96a-476e-ab67-a58b881a57b4
+# ╠═0e844578-ac8d-4dde-989e-9b0d624d5ec3
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
