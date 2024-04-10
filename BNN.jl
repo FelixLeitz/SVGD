@@ -22,6 +22,7 @@ begin
 	using Cubature
 	using QuadGK
 	using KernelDensity
+	using JLD2
 end
 
 # ╔═╡ d8468e73-0442-4230-92da-8dbda2173bf5
@@ -32,44 +33,33 @@ gr()
 
 # ╔═╡ 0bc42da9-08e9-401e-b4f6-991fcb3798a8
 begin
-	LAYERS 			= [1 4 8 4 1];
-	N_SAMPLES 		= 200;
-	LEARNING_RATE 	= 0.01;
-	N_EPOCHS 		= 10000;
-end
-
-# ╔═╡ 23045f98-b505-4a7a-9cb5-ac3c49c29283
-rng 				= Xoshiro(42);
-
-# ╔═╡ c56df9cf-c8ab-4711-ae55-b92725e749d7
+	layers 			= [1 4 8 4 1]
+	samples 		= 200
+	learning_rate 	= 0.01
+	epochs 	 		= 10000
+	#------------------------------------------------
+	rng 			= Xoshiro(42)
+	noise = Normal(0,1/4)
 	function f(x,rng)
-		return -2*x.^3+4x.^2-x+1/4*randn(rng,size(x))
+		return -2*x.^3+4x.^2-x+rand(noise,size(x))
+	end;
+	x_samples 			= sort(2.5*rand(rng,samples).-.5)
+	x_samples 			= x_samples'
+	f_samples 			= f(x_samples,rng)
+	#------------------------------------------------
+	model = Chain(
+		[Dense(input=>output, sigmoid) for (input, output) in zip(layers[1:end-2],layers[2:end-1])], Dense(layers[end-1],layers[end])
+	)
+	parameters, layer_states = Lux.setup(rng, model)
+	opt 		= Adam(learning_rate)
+	opt_state 	= Optimisers.setup(opt,parameters)
+	#------------------------------------------------
+	y_pred_init = model(x_samples,parameters,layer_states)[1]
+	mutable struct par
+	   mu::Array
+	   sigma::Matrix{Float64}
 	end
-
-# ╔═╡ 81ba55fe-34b7-43cd-8367-58595715793d
-begin
-	x_samples 			= 2.5*rand(rng,200).-.5;
-	x_samples 			= x_samples';
-	f_samples 			= f(x_samples,rng);
-end
-
-# ╔═╡ 251794a3-1d3e-4e95-94fa-da95f3dea64f
-model = Chain(
-	[Dense(input=>output, sigmoid) for (input, output) in zip(LAYERS[1:end-2],LAYERS[2:end-1])], Dense(LAYERS[end-1],LAYERS[end])
-)
-
-# ╔═╡ 35cf9868-bc2b-45dc-b986-23a6667a45e5
-parameters, layer_states = Lux.setup(rng, model);
-
-# ╔═╡ 0cf209f1-fea9-4aa1-b5a1-243d54be1161
-y_pred_init = model(x_samples,parameters,layer_states)
-
-# ╔═╡ 516ad0aa-12cc-44b3-9df0-a36ae4f2f39f
-begin
-	gr()
-	scatter(x_samples',f_samples',label="training data")
-	scatter!(x_samples',y_pred_init[1]',label="initial prediction")
-end
+end;
 
 # ╔═╡ e1c596d7-8b8e-4368-9d28-91710cf76ca0
 function loss_function(p, ls)
@@ -78,29 +68,23 @@ function loss_function(p, ls)
 	return loss, new_ls
 end
 
-# ╔═╡ f3a010fc-16bd-4478-a199-eb5e686ee373
-begin
-	opt 		= Adam(LEARNING_RATE);
-	opt_state 	= Optimisers.setup(opt,parameters);
-end
-
 # ╔═╡ 637ededd-5df0-43f9-91cd-44e861e857a9
 begin
-loss_history = []
-for epoch in 1:N_EPOCHS
-	(loss, layer_states), back 	= pullback(loss_function, parameters, layer_states)
-	grad , _ 					= back((1.0, nothing))
-	opt_state,  parameters 		= Optimisers.update(opt_state, parameters, grad)
-	push!(loss_history,loss)
-	if epoch % 1000 == 0
-		#println("Epoch: $epoch, Loss: $loss")
+	loss_history = []
+	for epoch in 1:epochs
+		(loss, layer_states), back 	= pullback(loss_function, parameters, layer_states)
+		grad , _ 					= back((1.0, nothing))
+		opt_state,  parameters 		= Optimisers.update(opt_state, parameters, grad)
+		push!(loss_history,loss)
+		if epoch % 1000 == 0
+			println("Epoch: $epoch, Loss: $loss")
+		end
 	end
-end
-	saved=parameters
-	y_pred = model(x_samples,parameters,layer_states)[1]
+	saved 			= parameters
+	y_pred 			= model(x_samples,parameters,layer_states)[1]
 	scatter(x_samples',f_samples',label="training data")
-	scatter!(x_samples',y_pred',label="prediction")
-	
+	scatter!(x_samples',y_pred',label="prediction after training")
+	scatter!(x_samples',y_pred_init',label="initial prediction")
 end		
 
 # ╔═╡ 8632d6f5-c69f-4c45-9a70-e78dbbccc1c3
@@ -127,12 +111,6 @@ function params2vector(params)
 	return vector
 end
 
-# ╔═╡ 1de1da1d-4d5b-4331-983e-f59694d02e26
-mutable struct par
-   mu::Array
-   sigma::Matrix{Float64}
-end
-
 # ╔═╡ ec8f8851-2595-4252-a1c7-3fbb24cc39b1
 begin
 	theta_init 			= params2vector(saved)
@@ -142,17 +120,11 @@ begin
 	priorDistribution   = MvNormal(dis.mu, Diagonal(abs2.(dis.sigma.*ones(n_params)')))
 	particles_init 		= rand(priorDistribution,20)
 	prior 				= x -> pdf(priorDistribution,x)
-	logprior(x)			= log(prior(x))
+	function logprior(x)
+		return -n_params/2*(log(2*pi)+log(σ^2))-1/(2*σ^2)*norm(x-dis.mu)^2
+	end
 	gradlogprior(x) 	= ForwardDiff.gradient(x->logprior(x),x)
-end
-
-# ╔═╡ c931f411-0613-435e-aa0a-f5159f202bd7
-function logprior2(x)
-	return -n_params/2*(log(2*pi)+log(σ^2))-1/(2*σ^2)*norm(x-dis.mu)^2
-end
-
-# ╔═╡ 2558a138-86c8-4f19-827d-ce316e8a7cec
-gradlogprior2(x) 	= ForwardDiff.gradient(x->logprior2(x),x)
+end;
 
 # ╔═╡ 2a82881f-281a-4ebb-ab49-4a5f739750ff
 function backprop_grad2(params)
@@ -174,49 +146,46 @@ end
 # ╔═╡ bc054a9a-bf9d-4654-87d7-93aee5392c26
 function update(param_vector)
 	params 		 	= vector_to_parameters(param_vector,parameters)
-	y_iter 			= model(x_samples,params,layer_states)[1]
-	a 				= -backprop_grad(params)
-	b 				= gradlogprior2(param_vector)
-	return a+b
+	return gradlogprior(param_vector)-backprop_grad(params)
 end
 
 # ╔═╡ 26448ee3-f2f6-421d-ab4b-e35e515619d3
 begin
 	function kernel(x1,x2)
-		h=.05
+		h =.001
 		return exp(-norm(x1-x2)^2*h)
 	end
-	grad_kernel(x1,x2)=ForwardDiff.gradient(x1->kernel(x1,x2),x1)
+	grad_kernel(x1,x2) = ForwardDiff.gradient(x1->kernel(x1,x2),x1)
 end
 
 # ╔═╡ 94f7c5c0-0b9c-4a91-a806-a25b94658c1c
 begin
-	its=500
-	nop=20
-	particles_it=zeros(its+1,nop,89)
-	particles_it[1,:,:]=particles_init'
-	for i = 1:its
-		particles_it[i+1,:,:]=svgd_gp(nop,particles_it[i,:,:],89,1,0.1,update,kernel,grad_kernel)[1,:,:]
+	iterations 			= 10000
+	nop 				= 20
+	particles_it 		= zeros(iterations+1,nop,89)
+	particles_it[1,:,:] = particles_init'
+	for i = 1:iterations
+		particles_it[i+1,:,:] = svgd_gp(nop,particles_it[i,:,:],89,1,.1,update,kernel,grad_kernel)[1,:,:]
 	end
-end
-
-# ╔═╡ 6f16fb69-9c9c-4f24-a7c6-46f45a051258
-begin
-l = @layout([a b ;c d ;e f])
-tt=	1
-p = plot(histogram(particles_it[tt,:,1]),histogram(particles_it[tt,:,2]),histogram(particles_it[tt,:,3]),histogram(particles_it[tt,:,4]),histogram(particles_it[tt,:,5]),histogram(particles_it[tt,:,6]),layout = l)
 end
 
 # ╔═╡ 8299f3bb-55d3-4ddc-849d-108df3ccb93b
 begin
-	y_pstart=zeros(nop,200)
-	y_pend=zeros(nop,200)
+	means 		= zeros(samples)
+	maxs 		= zeros(samples)
+	mins 		= zeros(samples)
+	y_pstart 	= zeros(nop,samples)
+	y_pend 		= zeros(nop,samples)
 	for i=1:nop
-		pstart=vector_to_parameters(particles_init[:,i],parameters)
-		pends=vector_to_parameters(particles_it[its+1,i,:],parameters)
-		#pends=vector_to_parameters(particles_init[:,i],parameters)
-		y_pstart[i,:]= model(x_samples,pstart,layer_states)[1]'
-		y_pend[i,:]= model(x_samples,pends,layer_states)[1]'
+		pstart 			= vector_to_parameters(particles_init[:,i],parameters)
+		pends=vector_to_parameters(particles_it[10000+1,i,:],parameters)
+		y_pstart[i,:] 	= model(x_samples,pstart,layer_states)[1]'
+		y_pend[i,:] 	= model(x_samples,pends,layer_states)[1]'
+	end
+	for j=1:samples
+		means[j] 	= mean(y_pend[:,j])
+		maxs[j] 	= maximum(y_pend[:,j])
+		mins[j] 	= minimum(y_pend[:,j])
 	end
 end
 
@@ -242,6 +211,14 @@ begin
 	scatter!(x_samples',y_pstart[18,:],label="")
 	scatter!(x_samples',y_pstart[19,:],label="")
 	scatter!(x_samples',y_pstart[20,:],label="")
+end
+
+# ╔═╡ 62764414-8612-40bd-b87f-6ea8a9de37c0
+begin
+	lower 		= means.-mins 
+	upper 		= maxs.-means
+	plot(x_samples',means;ribbon=(lower,upper),label="prediction")
+	scatter!(x_samples',f_samples',label="training data",ylims=(-2, 2))
 end
 
 # ╔═╡ e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
@@ -270,6 +247,74 @@ end
 # ╔═╡ b12ed512-7264-41ed-bf93-da6425e7576e
 scatter(x_samples',f_samples',label="training data",ylims=(-2, 2))
 
+# ╔═╡ 3b5d7fae-1de0-4e21-8cba-28c3558fef47
+begin
+l 		= @layout([a b ;c d ;e f])
+tt 		= 1000
+ix_par  = 1
+p = plot(histogram(particles_it[100,:,ix_par]),histogram(particles_it[500,:,ix_par]),histogram(particles_it[1*tt,:,ix_par]),histogram(particles_it[2*tt,:,ix_par]),histogram(particles_it[5*tt,:,5]),histogram(particles_it[10*tt,:,ix_par]),layout = l)
+end
+
+# ╔═╡ a2fa97d9-2b0e-4096-ad8c-64e264d28804
+function fexact(z)
+	return -2*z.^3+4z.^2-z
+end
+
+# ╔═╡ 17f8c4fe-34b9-4e76-a615-3bc6d12b5b35
+function ixin(y,array)
+	i=0
+	while array[i+1]<y && i<19
+		i+=1
+	end
+	return i 
+end
+
+# ╔═╡ 827a3dfc-a5ce-4af0-b77a-607a573a0b93
+function fdiff(y,pts,tdis) 
+	return abs(ixin(y,pts)/20-cdf(tdis,y))
+end
+
+# ╔═╡ d070d14a-0597-4b56-8efa-0371934a1242
+begin
+	function wasserdis(y_distest)
+		sum=0
+		for idx=1:200
+			pts=sort(y_distest[:,idx])
+			vals=collect(range(0.0,1,20))
+			x=[pts[1]-1]
+			y=[0]
+			for i = 1:nop-1
+				x=vcat(x,[pts[i],pts[i]])
+				y=vcat(y,[vals[i],vals[i+1]])
+			end
+			x=vcat(x,[pts[nop]+1])
+			y=vcat(y,[1])
+			tdis=Normal(fexact(x_samples[idx]),1/4)
+			sum=sum+quadgk(z -> fdiff(z,pts,tdis), -1,2)[1]
+		end
+		sum=sum/200
+		return sum
+	end
+end
+
+# ╔═╡ 813d1dda-a39b-474c-a0c2-891695e47ae8
+begin
+	distances=zeros(101)
+	for j=1:101			
+		y_distest 		= zeros(nop,samples)
+		for i=1:nop
+				p_distest=vector_to_parameters(particles_it[100*(j-1)+1,i,:],parameters)
+				y_distest[i,:] 	= model(x_samples,p_distest,layer_states)[1]'
+		end
+		distances[j]=wasserdis(y_distest)
+	end
+	plot(100*(1:101),distances,label="Wasserstein distance",xlabel="Iterations",ylabel="wasserstein distance")
+end
+
+
+# ╔═╡ cc429ee4-9151-4f5f-831c-eb20797c1593
+#jldsave("it10k_part20.jld2"; result=particles_it)
+
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
 [deps]
@@ -278,6 +323,7 @@ Distributions = "31c24e10-a181-5473-b8eb-7969acd0382f"
 DistributionsAD = "ced4e74d-a319-5a8a-b0ac-84af2272839c"
 ForwardDiff = "f6369f11-7733-5829-9624-2563aa707210"
 Functors = "d9f16b24-f501-4c13-a1f2-28368ffc5196"
+JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
 KernelDensity = "5ab0869b-81aa-558d-bb23-cbf5423bbe9b"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Lux = "b2108857-7c20-44ae-9111-449ecde12c47"
@@ -296,6 +342,7 @@ Distributions = "~0.25.107"
 DistributionsAD = "~0.6.53"
 ForwardDiff = "~0.10.36"
 Functors = "~0.4.7"
+JLD2 = "~0.4.45"
 KernelDensity = "~0.6.8"
 Lux = "~0.5.15"
 Optimisers = "~0.3.2"
@@ -312,7 +359,7 @@ PLUTO_MANIFEST_TOML_CONTENTS = """
 
 julia_version = "1.9.3"
 manifest_format = "2.0"
-project_hash = "126957c42ec51398be240c888db0ee0818ec9b2a"
+project_hash = "de683b707111d9c11aba13b3c633c00cc22ff0eb"
 
 [[deps.ADTypes]]
 git-tree-sha1 = "41c37aa88889c171f1300ceac1313c06e891d245"
@@ -644,6 +691,12 @@ git-tree-sha1 = "c6033cc3892d0ef5bb9cd29b7f2f0331ea5184ea"
 uuid = "f5851436-0d7a-5f13-b9de-f02708fd171a"
 version = "3.3.10+0"
 
+[[deps.FileIO]]
+deps = ["Pkg", "Requires", "UUIDs"]
+git-tree-sha1 = "c5c28c245101bd59154f649e19b038d15901b5dc"
+uuid = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
+version = "1.16.2"
+
 [[deps.FileWatching]]
 uuid = "7b1f6079-737a-58dc-b8bc-7a2ca5c1b5ee"
 
@@ -833,6 +886,12 @@ version = "0.2.2"
 git-tree-sha1 = "a3f24677c21f5bbe9d2a714f95dcd58337fb2856"
 uuid = "82899510-4779-5014-852e-03e436cf321d"
 version = "1.0.0"
+
+[[deps.JLD2]]
+deps = ["FileIO", "MacroTools", "Mmap", "OrderedCollections", "Pkg", "PrecompileTools", "Printf", "Reexport", "Requires", "TranscodingStreams", "UUIDs"]
+git-tree-sha1 = "7c0008f0b7622c6c0ee5c65cbc667b69f8a65672"
+uuid = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
+version = "0.4.45"
 
 [[deps.JLFzf]]
 deps = ["Pipe", "REPL", "Random", "fzf_jll"]
@@ -1996,35 +2055,31 @@ version = "1.4.1+1"
 """
 
 # ╔═╡ Cell order:
-# ╟─612edb82-dd5a-11ee-13ec-9164bf6c4de7
+# ╠═612edb82-dd5a-11ee-13ec-9164bf6c4de7
 # ╟─7aa672ae-3b8b-497f-8aed-edcc98c4a89c
 # ╟─d8468e73-0442-4230-92da-8dbda2173bf5
 # ╠═0bc42da9-08e9-401e-b4f6-991fcb3798a8
-# ╠═23045f98-b505-4a7a-9cb5-ac3c49c29283
-# ╟─c56df9cf-c8ab-4711-ae55-b92725e749d7
-# ╠═81ba55fe-34b7-43cd-8367-58595715793d
-# ╠═251794a3-1d3e-4e95-94fa-da95f3dea64f
-# ╠═35cf9868-bc2b-45dc-b986-23a6667a45e5
-# ╠═0cf209f1-fea9-4aa1-b5a1-243d54be1161
-# ╠═516ad0aa-12cc-44b3-9df0-a36ae4f2f39f
-# ╠═e1c596d7-8b8e-4368-9d28-91710cf76ca0
-# ╠═f3a010fc-16bd-4478-a199-eb5e686ee373
+# ╟─e1c596d7-8b8e-4368-9d28-91710cf76ca0
 # ╠═637ededd-5df0-43f9-91cd-44e861e857a9
 # ╟─8632d6f5-c69f-4c45-9a70-e78dbbccc1c3
 # ╟─ae3031f6-874a-459e-abdb-517cb0160f0a
-# ╟─1de1da1d-4d5b-4331-983e-f59694d02e26
 # ╠═ec8f8851-2595-4252-a1c7-3fbb24cc39b1
-# ╠═c931f411-0613-435e-aa0a-f5159f202bd7
-# ╠═2558a138-86c8-4f19-827d-ce316e8a7cec
 # ╟─2a82881f-281a-4ebb-ab49-4a5f739750ff
 # ╟─e89720c7-0436-4d8b-a1e2-6415397e2e0e
 # ╠═bc054a9a-bf9d-4654-87d7-93aee5392c26
 # ╠═26448ee3-f2f6-421d-ab4b-e35e515619d3
-# ╠═6f16fb69-9c9c-4f24-a7c6-46f45a051258
 # ╠═94f7c5c0-0b9c-4a91-a806-a25b94658c1c
 # ╠═8299f3bb-55d3-4ddc-849d-108df3ccb93b
+# ╠═813d1dda-a39b-474c-a0c2-891695e47ae8
 # ╟─ea2b9629-a0d0-44cb-8eab-5768f82ff2cd
+# ╟─62764414-8612-40bd-b87f-6ea8a9de37c0
 # ╟─e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
 # ╟─b12ed512-7264-41ed-bf93-da6425e7576e
+# ╟─3b5d7fae-1de0-4e21-8cba-28c3558fef47
+# ╟─a2fa97d9-2b0e-4096-ad8c-64e264d28804
+# ╟─d070d14a-0597-4b56-8efa-0371934a1242
+# ╟─17f8c4fe-34b9-4e76-a615-3bc6d12b5b35
+# ╟─827a3dfc-a5ce-4af0-b77a-607a573a0b93
+# ╠═cc429ee4-9151-4f5f-831c-eb20797c1593
 # ╟─00000000-0000-0000-0000-000000000001
 # ╟─00000000-0000-0000-0000-000000000002
