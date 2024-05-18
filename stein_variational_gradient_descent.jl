@@ -1,5 +1,5 @@
 ### A Pluto.jl notebook ###
-# v0.19.38
+# v0.19.40
 
 using Markdown
 using InteractiveUtils
@@ -175,15 +175,16 @@ end
 function svgd_gp(np,particles,dims,ni,stepsize,grad_log_p,kernel,grad_kernel)
 	ϵ=stepsize
 	temp=zeros(np,dims)
-	Iterations=zeros(ni,np,dims)
+	#Iterations=zeros(ni,np,dims)
 	for j in 1:ni
 		for i in 1:np
 			temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles,np,dims,grad_log_p,kernel,grad_kernel)
 		end	
 		particles=copy(temp)
-		Iterations[j,:,:]=copy(temp)
+		#Iterations[j,:,:]=copy(temp)
 	end
-	return Iterations
+	#return Iterations
+	return particles
 end
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
