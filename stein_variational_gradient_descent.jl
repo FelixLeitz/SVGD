@@ -20,14 +20,11 @@ end
 # ╔═╡ 9ca06369-d13f-4da3-a1de-cbceaf067189
 md"""# Stein Variational Gradient Descent"""
 
-# ╔═╡ bb6916c1-7056-44b3-a8ab-f7b03c0945b4
-md"""### Underlying framework"""
-
-# ╔═╡ b525fb70-0f52-4051-b664-1bd9305201bb
-gr()
-
 # ╔═╡ 5d85e6bf-d7e7-4cea-b76d-c50dc8ac8957
 md"""###### An assortment of examples for distributions and a kernel"""
+
+# ╔═╡ ffce6a50-b284-4035-a049-8570ba89fb01
+md"""Gaussian distribution:"""
 
 # ╔═╡ d202a8e8-f5f7-4465-bd00-af54a86eeb1d
 begin
@@ -50,6 +47,9 @@ begin
 gradloggauss(x::T) where{T<:Real} = ForwardDiff.derivative(x->loggauss(x),x)
 gradloggauss(x::AbstractArray{T}) where{T<:Real} = ForwardDiff.gradient(x->loggauss(x),x)
 end
+
+# ╔═╡ 86d572d3-4236-4f45-b03a-e4e4a3519fe5
+md"""Hybrid Rosenbrock distribution defined at: https://arxiv.org/abs/1903.09556"""
 
 # ╔═╡ 76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
 function hybrid_rosenbrock(x)
@@ -79,6 +79,9 @@ loghybros(x)=log(hybrid_rosenbrock(x))
 # ╔═╡ 1d315a90-7d14-4695-b603-001337c50b3b
 gradloghybros(x)=ForwardDiff.gradient(x->loghybros(x),x)
 
+# ╔═╡ 3f3bd42b-86ce-4c74-839a-4079e39912e0
+md"""Standard 2D-Rosenbrock distribution"""
+
 # ╔═╡ f0ab61b2-abea-4daa-838c-73d9b6513796
 begin
 	rosenbrock(x) = exp(-((1.0 - x[1])^2 + 100 * (x[2] - x[1]^2)^2)/20)
@@ -90,6 +93,9 @@ logros(x) = log(rosenbrock(x))
 
 # ╔═╡ d71ec419-c995-4425-8196-b5cd20d67957
 gradlogros(x) = ForwardDiff.gradient(x->logros(x),x)
+
+# ╔═╡ da143417-6b34-474e-bd0e-d0df2b0a72ca
+md"""RBF Kernel"""
 
 # ╔═╡ 33af7cc0-d0d1-4336-a5a0-3464f99a14ce
 begin
@@ -105,60 +111,25 @@ gradk(x1::T,x2) where {T<:Real}= ForwardDiff.derivative(x1->k(x1,x2),x1)
 gradk(x1::AbstractArray{T},x2) where {T<:Real} = ForwardDiff.gradient(x1->k(x1,x2),x1)
 end
 
-# ╔═╡ 75697ad3-b0f4-414c-befa-d9415e0f6839
-md"""###### functions for generating d-dimenesional grids with the amount of points specified by n"""
-
-# ╔═╡ c16badd0-8814-4508-8d17-24e36afbd669
-function nd_grid_1(n,dims)
-	grid=collect(range(-1,1,n))
-	for i in 2:dims
-		grid=hcat(grid,range(-0,1,n))
-	end
-	return grid
-end
-
-# ╔═╡ 2ac0f29b-a82a-4e87-908a-f0fcad5fb600
-function nd_grid_2(n,dims)
-	tuples = Iterators.product(range(-1,1,n[1]),range(-1,1,n[2]))
-	tuples = vec(collect(tuples))
-	grid=zeros(length(tuples),2);
-	for i in 1:length(tuples)
-		grid[i,:]=[j for j in tuples[i]]
-	end
-	for i in 3:dims
-		grid=hcat(grid,range(-0,1,n[1]*n[2]))
-	end
-	return grid
-end
-
 # ╔═╡ eac35eda-1afb-40a3-8295-260e4b8ff103
 md"""###### Stein variational gradient descent, the iterative update function Φ and the approximation of the probability density"""
-
-# ╔═╡ 8905026c-1750-4867-9813-27d78d2574f6
-function approximation(x,data,mini_batches)
-	approx=0
-	for i in 1:size(mini_batches,1)
-		approx+=likelihood(data[mini_batches[i,1]:mini_batches[i,2]],x)
-	end
-	approx=approx*size(data,1)/size(mini_batches,1)
-	approx+=prior(x)
-	return approx
-end
 
 # ╔═╡ de554a2d-df2a-4210-a88d-8d3d7430df73
 function ϕ(xi,x,np,dims,grad_log_p,kernel,grad_kernel)
 	n=dims
-	sum=zeros(n,1)
+	summed=zeros(n,1)
 	for j in 1:np
-		sum+=kernel(x[j,:],xi)*grad_log_p(x[j,:])+grad_kernel(x[j,:],xi) 
+		summed+=kernel(x[j,:],xi)*grad_log_p(x[j,:])+grad_kernel(x[j,:],xi) 
 	end
-	return 1/size(x,1)*sum
+	return 1/size(x,1)*summed
 end
 
+# ╔═╡ 12e976fe-21e4-480c-b869-c1d52748b151
+md"""Two versions of the SVGD algorithm, one saves and returns all intermediate results, while the other only returns the final result of the iterative process. During each iteration each of the particles is transported to its next location via the update function Φ"""
+
 # ╔═╡ 4642310b-3a2f-4945-8cc0-9e9ace0f18d9
-function svgd(np,dims,ni,stepsize,grad_log_p,kernel,grad_kernel)
+function svgd_allIntermediateResults(np,particles,dims,ni,stepsize,grad_log_p,kernel,grad_kernel)
 	ϵ=stepsize
-	particles=nd_grid_1(np,dims)
 	temp=zeros(np,dims)
 	Iterations=zeros(ni,np,dims)
 	for j in 1:ni
@@ -172,18 +143,15 @@ function svgd(np,dims,ni,stepsize,grad_log_p,kernel,grad_kernel)
 end
 
 # ╔═╡ 5757f6a0-fc5b-498f-8c8a-9f1349841b9a
-function svgd_gp(np,particles,dims,ni,stepsize,grad_log_p,kernel,grad_kernel)
+function svgd_onlyFinalResult(np,particles,dims,ni,stepsize,grad_log_p,kernel,grad_kernel)
 	ϵ=stepsize
 	temp=zeros(np,dims)
-	#Iterations=zeros(ni,np,dims)
 	for j in 1:ni
 		for i in 1:np
 			temp[i,:]=particles[i,:]+ϵ*ϕ(particles[i,:],particles,np,dims,grad_log_p,kernel,grad_kernel)
 		end	
 		particles=copy(temp)
-		#Iterations[j,:,:]=copy(temp)
 	end
-	#return Iterations
 	return particles
 end
 
@@ -215,7 +183,7 @@ Todo = "~0.1.0"
 PLUTO_MANIFEST_TOML_CONTENTS = """
 # This file is machine-generated - editing it directly is not advised
 
-julia_version = "1.9.3"
+julia_version = "1.10.2"
 manifest_format = "2.0"
 project_hash = "326eb3f701548f6eeb2f625ab1c135af4d6d2c82"
 
@@ -354,7 +322,7 @@ weakdeps = ["Dates", "LinearAlgebra"]
 [[deps.CompilerSupportLibraries_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "e66e0078-7015-5450-92f7-15fbd957f2ae"
-version = "1.0.5+0"
+version = "1.1.0+0"
 
 [[deps.ConcurrentUtilities]]
 deps = ["Serialization", "Sockets"]
@@ -772,21 +740,26 @@ uuid = "4af54fe1-eca0-43a8-85a7-787d91b784e3"
 [[deps.LibCURL]]
 deps = ["LibCURL_jll", "MozillaCACerts_jll"]
 uuid = "b27032c2-a3e7-50c8-80cd-2d36dbcbfd21"
-version = "0.6.3"
+version = "0.6.4"
 
 [[deps.LibCURL_jll]]
 deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll", "Zlib_jll", "nghttp2_jll"]
 uuid = "deac9b47-8bc7-5906-a0fe-35ac56dc84c0"
-version = "7.84.0+0"
+version = "8.4.0+0"
 
 [[deps.LibGit2]]
-deps = ["Base64", "NetworkOptions", "Printf", "SHA"]
+deps = ["Base64", "LibGit2_jll", "NetworkOptions", "Printf", "SHA"]
 uuid = "76f85450-5226-5b5a-8eaa-529ad045b433"
+
+[[deps.LibGit2_jll]]
+deps = ["Artifacts", "LibSSH2_jll", "Libdl", "MbedTLS_jll"]
+uuid = "e37daf67-58a4-590a-8e99-b0245dd2ffc5"
+version = "1.6.4+0"
 
 [[deps.LibSSH2_jll]]
 deps = ["Artifacts", "Libdl", "MbedTLS_jll"]
 uuid = "29816b5a-b9ab-546f-933c-edad1886dfa8"
-version = "1.10.2+0"
+version = "1.11.0+1"
 
 [[deps.Libdl]]
 uuid = "8f399da3-3557-5675-b5ff-fb832c97cbdb"
@@ -898,7 +871,7 @@ version = "1.1.9"
 [[deps.MbedTLS_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "c8ffd9c3-330d-5841-b78e-0817d7145fa1"
-version = "2.28.2+0"
+version = "2.28.2+1"
 
 [[deps.Measures]]
 git-tree-sha1 = "c13304c81eec1ed3af7fc20e75fb6b26092a1102"
@@ -916,7 +889,7 @@ uuid = "a63ad114-7e13-5084-954f-fe012c677804"
 
 [[deps.MozillaCACerts_jll]]
 uuid = "14a3606d-f60d-562e-9121-12d972cd8159"
-version = "2022.10.11"
+version = "2023.1.10"
 
 [[deps.NaNMath]]
 deps = ["OpenLibm_jll"]
@@ -943,12 +916,12 @@ version = "1.3.5+1"
 [[deps.OpenBLAS_jll]]
 deps = ["Artifacts", "CompilerSupportLibraries_jll", "Libdl"]
 uuid = "4536629a-c528-5b80-bd46-f80d51c5b363"
-version = "0.3.21+4"
+version = "0.3.23+4"
 
 [[deps.OpenLibm_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "05823500-19ac-5b8b-9628-191a04bc5112"
-version = "0.8.1+0"
+version = "0.8.1+2"
 
 [[deps.OpenSSL]]
 deps = ["BitFlags", "Dates", "MozillaCACerts_jll", "OpenSSL_jll", "Sockets"]
@@ -982,7 +955,7 @@ version = "1.6.3"
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "efcefdf7-47ab-520b-bdef-62a2eaa19f15"
-version = "10.42.0+0"
+version = "10.42.0+1"
 
 [[deps.PDMats]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1010,7 +983,7 @@ version = "0.42.2+0"
 [[deps.Pkg]]
 deps = ["Artifacts", "Dates", "Downloads", "FileWatching", "LibGit2", "Libdl", "Logging", "Markdown", "Printf", "REPL", "Random", "SHA", "Serialization", "TOML", "Tar", "UUIDs", "p7zip_jll"]
 uuid = "44cfe95a-1eb2-52ea-b672-e2afdf69b78f"
-version = "1.9.2"
+version = "1.10.0"
 
 [[deps.PlotThemes]]
 deps = ["PlotUtils", "Statistics"]
@@ -1083,7 +1056,7 @@ deps = ["InteractiveUtils", "Markdown", "Sockets", "Unicode"]
 uuid = "3fa0cd96-eef1-5676-8a61-b3b8758bbffb"
 
 [[deps.Random]]
-deps = ["SHA", "Serialization"]
+deps = ["SHA"]
 uuid = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 
 [[deps.Ratios]]
@@ -1183,6 +1156,7 @@ version = "1.2.0"
 [[deps.SparseArrays]]
 deps = ["Libdl", "LinearAlgebra", "Random", "Serialization", "SuiteSparse_jll"]
 uuid = "2f01184e-e22b-5df5-ae63-d93ebab69eaf"
+version = "1.10.0"
 
 [[deps.SparseInverseSubset]]
 deps = ["LinearAlgebra", "SparseArrays", "SuiteSparse"]
@@ -1218,7 +1192,7 @@ version = "1.4.2"
 [[deps.Statistics]]
 deps = ["LinearAlgebra", "SparseArrays"]
 uuid = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
-version = "1.9.0"
+version = "1.10.0"
 
 [[deps.StatsAPI]]
 deps = ["LinearAlgebra"]
@@ -1257,9 +1231,9 @@ deps = ["Libdl", "LinearAlgebra", "Serialization", "SparseArrays"]
 uuid = "4607b0f0-06f3-5cda-b6b1-a6196a1729e9"
 
 [[deps.SuiteSparse_jll]]
-deps = ["Artifacts", "Libdl", "Pkg", "libblastrampoline_jll"]
+deps = ["Artifacts", "Libdl", "libblastrampoline_jll"]
 uuid = "bea87d4a-7f5b-5778-9afe-8cc45184846c"
-version = "5.10.1+6"
+version = "7.2.1+1"
 
 [[deps.TOML]]
 deps = ["Dates"]
@@ -1545,7 +1519,7 @@ version = "1.5.0+0"
 [[deps.Zlib_jll]]
 deps = ["Libdl"]
 uuid = "83775a58-1f1d-513f-b197-d71354ab007a"
-version = "1.2.13+0"
+version = "1.2.13+1"
 
 [[deps.Zstd_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl"]
@@ -1592,7 +1566,7 @@ version = "0.15.1+0"
 [[deps.libblastrampoline_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850b90-86db-534c-a0d3-1478176c7d93"
-version = "5.8.0+0"
+version = "5.8.0+1"
 
 [[deps.libevdev_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1633,12 +1607,12 @@ version = "1.1.6+0"
 [[deps.nghttp2_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "8e850ede-7688-5339-a07c-302acd2aaf8d"
-version = "1.48.0+0"
+version = "1.52.0+1"
 
 [[deps.p7zip_jll]]
 deps = ["Artifacts", "Libdl"]
 uuid = "3f19e933-33d8-53b3-aaab-bd5110c3b7a0"
-version = "17.4.0+0"
+version = "17.4.0+2"
 
 [[deps.x264_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -1662,26 +1636,25 @@ version = "1.4.1+1"
 # ╔═╡ Cell order:
 # ╟─9ca06369-d13f-4da3-a1de-cbceaf067189
 # ╠═038b4f11-c95f-459a-97cf-9869e653ec04
-# ╟─bb6916c1-7056-44b3-a8ab-f7b03c0945b4
-# ╟─b525fb70-0f52-4051-b664-1bd9305201bb
 # ╟─5d85e6bf-d7e7-4cea-b76d-c50dc8ac8957
+# ╟─ffce6a50-b284-4035-a049-8570ba89fb01
 # ╟─d202a8e8-f5f7-4465-bd00-af54a86eeb1d
 # ╟─3a1a79da-7cf9-4fc2-9f76-13e57eddfe08
 # ╟─79bcf510-d55b-4dbe-8303-f87455ba3abd
+# ╟─86d572d3-4236-4f45-b03a-e4e4a3519fe5
 # ╟─76d212ce-8ca7-11ee-3ac9-bf85eec3fb5c
 # ╟─5a8f2fea-3bd1-4a8a-b377-5beb1deb1178
 # ╟─1d315a90-7d14-4695-b603-001337c50b3b
+# ╟─3f3bd42b-86ce-4c74-839a-4079e39912e0
 # ╟─f0ab61b2-abea-4daa-838c-73d9b6513796
 # ╟─9c7c45fc-df01-48b7-a8cf-162bbdf756a6
 # ╟─d71ec419-c995-4425-8196-b5cd20d67957
+# ╟─da143417-6b34-474e-bd0e-d0df2b0a72ca
 # ╟─33af7cc0-d0d1-4336-a5a0-3464f99a14ce
 # ╟─cb20b5e5-7862-4fdf-9281-e716a7dbe3bc
-# ╟─75697ad3-b0f4-414c-befa-d9415e0f6839
-# ╟─c16badd0-8814-4508-8d17-24e36afbd669
-# ╟─2ac0f29b-a82a-4e87-908a-f0fcad5fb600
 # ╟─eac35eda-1afb-40a3-8295-260e4b8ff103
-# ╠═8905026c-1750-4867-9813-27d78d2574f6
 # ╠═de554a2d-df2a-4210-a88d-8d3d7430df73
+# ╟─12e976fe-21e4-480c-b869-c1d52748b151
 # ╠═4642310b-3a2f-4945-8cc0-9e9ace0f18d9
 # ╠═5757f6a0-fc5b-498f-8c8a-9f1349841b9a
 # ╟─00000000-0000-0000-0000-000000000001

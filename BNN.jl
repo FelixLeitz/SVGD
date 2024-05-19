@@ -181,13 +181,15 @@ begin
 	#standard deviation of the prior
 	σ 	 				= 1
 	#number of particles used for SVGD
-	nop 				= 64
+	nop 				= 20
 	#number of params for the neural network
 	n_params 			= Lux.parameterlength(parameters)
+	#define prior mean and variance
 	priorSpecs 			= priorSpecification(zeros(n_params)+theta_init,ones(n_params,1).*σ)
 	priorDistribution   = MvNormal(priorSpecs.mu, Diagonal(abs2.(priorSpecs.sigma.*ones(n_params)')))
+	#sample initial particle set from prior
 	particles_init 		= rand(priorDistribution,nop)
-	priorpdf 			= x -> pdf(priorDistribution,x)
+	prior 				= x -> pdf(priorDistribution,x)
 	function logprior(x)
 		return -n_params/2*(log(2*pi)+log(σ^2))-1/(2*σ^2)*norm(x-priorSpecs.mu)^2
 	end
@@ -204,36 +206,50 @@ begin
 	end
 end
 
+# ╔═╡ 2c759c0d-bb3f-41fe-a975-ccb04d0c6bea
+md"""Combined log-prior gradient with backpropagation gradient to aquire the posterior gradient approximation used in the SVGD update step."""
+
 # ╔═╡ bc054a9a-bf9d-4654-87d7-93aee5392c26
 function update(param_vector)
 	params = vector_to_parameters(param_vector,parameters)
 	return gradlogprior(param_vector)-backprop_grad(params)
 end
 
+# ╔═╡ 66f9b63e-8cd4-4a8c-bd8e-25f9905fdb12
+md"""SVGD Kernel"""
+
 # ╔═╡ 26448ee3-f2f6-421d-ab4b-e35e515619d3
 begin
 	function kernel(x1,x2)
-		bandwidth = 10
-		return exp(-norm(x1-x2)^2/bandwidth)
+		bandwidth = 5
+		return exp(-norm(x1-x2)^2/(2*bandwidth^2))
 	end
 	grad_kernel(x1,x2) = ForwardDiff.gradient(x1->kernel(x1,x2),x1)
 end
 
 # ╔═╡ 8c23ee52-1748-4d5b-a051-0c07fe4b5765
-md"""##### SVGD iteration"""
+md"""##### SVGD"""
 
-# ╔═╡ 94f7c5c0-0b9c-4a91-a806-a25b94658c1c
-begin
-	iterations 			= 20
-	particles_it 		= zeros(iterations+1,nop,n_params)
-	particles_it[1,:,:] = particles_init'
-	for i = 1:iterations
-		particles_it[i+1,:,:] = svgd_gp(nop,particles_it[i,:,:],n_params,1,.2,update,kernel,grad_kernel)
-	end
-end;
+# ╔═╡ db9de9f0-d895-4ae0-9cce-a374e6b7c26c
+md"""Load result file (optional)."""
+
+# ╔═╡ 87d89336-f3ab-49b9-8516-f195dea9ed44
+md"""Performs SVGD for a specified number of iterations saves all particle states"""
 
 # ╔═╡ 54f50b52-3822-445c-9c47-b74de425c92d
 md"""##### Data processing and vizualisation"""
+
+# ╔═╡ a851b2b6-7fc4-4846-9ec1-028bde78d183
+md"""Log-Log plot of the Wasserstein Distance over the iterations"""
+
+# ╔═╡ 14edea53-261d-4651-bb24-624749d39cef
+md"""Wasserstein Distance for different amount of iterations"""
+
+# ╔═╡ f54d8b59-00af-41ab-8e94-fa1a6685113b
+md"""Minimum and final Wasserstein Distance:"""
+
+# ╔═╡ 4c34164b-bb2a-4064-be42-2f99f6c9e3b4
+md"""Average variance in the particle parameters variance:"""
 
 # ╔═╡ 01e72291-31f9-4978-afbb-013906c9cab7
 begin
@@ -244,8 +260,23 @@ begin
 	variance_params=variance_params/n_params
 end
 
+# ╔═╡ a754a107-9cdf-4759-9144-366da803ca68
+md"""Average variance in the prediction values variance:"""
+
+# ╔═╡ a497734d-1b2d-42ed-907f-6f79de521635
+md"""Prediction for all particles, on the top (start), on the bottom (final):"""
+
+# ╔═╡ 7cf103a4-ef2b-4715-83e7-dc4586d498d1
+md"""Prediction for the final set of particles, compared to the 2σ-quantile of the data-generating funciton and the training datapoints:"""
+
+# ╔═╡ df3039a7-9b7a-45b0-bc7a-49106a31641b
+md"""Training datapoints:"""
+
 # ╔═╡ b12ed512-7264-41ed-bf93-da6425e7576e
 scatter(x_samples',f_samples',label="training data",ylims=(-2, 2))
+
+# ╔═╡ 34e71596-9c53-4c94-8fed-aa773c81b548
+md"""Visualisation of the marginal distributions of the particles values for different iterations:"""
 
 # ╔═╡ 0871844d-80b9-4296-9f13-99c52be2c8c3
 @bind ix_par Slider(1:n_params)
@@ -260,30 +291,34 @@ p = plot(histogram(particles_it[ix_its,:,ix_par]))
 end
 
 # ╔═╡ a2fa97d9-2b0e-4096-ad8c-64e264d28804
+#data generating function
 function fexact(z)
 	return -2*z.^3+4z.^2-z
 end
 
 # ╔═╡ 8299f3bb-55d3-4ddc-849d-108df3ccb93b
 begin
+	#get the mean, maximum and minimum of the particle inferred predicitons at each query point
 	means 		= zeros(samples)
 	maxs 		= zeros(samples)
 	mins 		= zeros(samples)
+	#exact function values with the 2σ-regions at the query points
 	exact 		= zeros(samples)
-	exactmax 		= zeros(samples)
-	exactmin 		= zeros(samples)
-	y_pstart 	= zeros(nop,samples)
-	y_pend 		= zeros(nop,samples)
+	exactmax 	= zeros(samples)
+	exactmin 	= zeros(samples)
+	#neural network predictions for all particles at each query point
+	y_start 	= zeros(nop,samples)
+	y_final 	= zeros(nop,samples)
 	for i=1:nop
 		pstart 			= vector_to_parameters(particles_init[:,i],parameters)
 		pends=vector_to_parameters(particles_it[iterations+1,i,:],parameters)
-		y_pstart[i,:] 	= model(x_samples,pstart,layer_states)[1]'
-		y_pend[i,:] 	= model(x_samples,pends,layer_states)[1]'
+		y_start[i,:] 	= model(x_samples,pstart,layer_states)[1]'
+		y_final[i,:] 	= model(x_samples,pends,layer_states)[1]'
 	end
 	for j=1:samples
-		means[j] 	= mean(y_pend[:,j])
-		maxs[j] 	= maximum(y_pend[:,j])
-		mins[j] 	= minimum(y_pend[:,j])
+		means[j] 	= mean(y_final[:,j])
+		maxs[j] 	= maximum(y_final[:,j])
+		mins[j] 	= minimum(y_final[:,j])
 		exact[j] 	= fexact(x_samples[j])
 		exactmax[j] 	= exact[j]+1/2
 		exactmin[j] 	= exact[j]-1/2
@@ -294,7 +329,7 @@ end
 begin
 	variance_values=0
 	for i=1:samples
-		variance_values+=var(y_pend[:,i])
+		variance_values+=var(y_final[:,i])
 	end
 	variance_values=variance_values/samples
 end
@@ -302,11 +337,21 @@ end
 # ╔═╡ 495f05b2-f16a-44b4-943a-e75df45db211
 begin
 	xpart=repeat(x_samples,1,nop)
-	ypart=y_pstart[1,:]
+	ypart=y_start[1,:]
 	for i=2:nop
-		ypart=vcat(ypart,y_pstart[i,:])
+		ypart=vcat(ypart,y_start[i,:])
 	end
 	scatter(xpart',ypart,label="")
+end
+
+# ╔═╡ e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
+begin
+	xpart2=repeat(x_samples,1,nop)
+	ypart2=y_final[1,:]
+	for i=2:nop
+		ypart2=vcat(ypart2,y_final[i,:])
+	end
+	scatter(xpart2',ypart2,label="")
 end
 
 # ╔═╡ 62764414-8612-40bd-b87f-6ea8a9de37c0
@@ -318,20 +363,17 @@ begin
 	scatter!(x_samples',f_samples',label="training data")	
 end
 
-# ╔═╡ e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
-begin
-	xpart2=repeat(x_samples,1,nop)
-	ypart2=y_pend[1,:]
-	for i=2:nop
-		ypart2=vcat(ypart2,y_pend[i,:])
-	end
-	scatter(xpart2',ypart2,label="")
-end
+# ╔═╡ f762ade5-f653-4008-a4d6-d26e2b713576
+md"""Computes the Wasserstein distance between the empiric particle inferred distribution and the target distribution averaged over all query points:"""
+
+# ╔═╡ feb43347-712d-4978-821d-047e82de38e8
+md"""Function to visualize the empiric particle inferred distribution and the target distribution:"""
 
 # ╔═╡ 04016383-d2ed-4ab7-8523-730083eca4c3
-function pltwasser(y_distest,idx)
-	pts=sort(y_distest[:,idx])
+function pltwasserdis(y_distanceeval,idx)
+	pts=sort(y_distanceeval[:,idx])
 	vals=collect(range(0.0,1,nop))
+	#generate sequence of points for the empiric distribution
 	x=[pts[1]-1]
 	y=[0]
 	for i = 1:nop-1
@@ -340,18 +382,34 @@ function pltwasser(y_distest,idx)
 	end
 	x=vcat(x,[pts[nop]+1])
 	y=vcat(y,[1])
+	#resample the values to a fine sequence
+	a=1
+	while a < length(x)
+		if x[a+1]-x[a]>.1
+			x=vcat(vcat(x[1:a],x[a]+0.01),x[a+1:end])
+			y=vcat(vcat(y[1:a],y[a]),y[a+1:end])
+		end
+		a=a+1
+	end
+	#lower and upped boundaries for plotting
 	lower=min(x[1],fexact(x_samples[idx])-1)
 	upper=max(last(x),fexact(x_samples[idx])+1)
+	#target distribution
 	tdis=Normal(fexact(x_samples[idx]),1/4)
 	query=range(lower,upper,100)
-	plt3=plot(x,y,label="prediction",ylabel="culumative density function",xlabel="f(x)")
-	plot!(query,cdf(tdis,query),label="actual distribution")
+	#shaded area
+	plot(x,cdf(tdis,x),fillrange = y, fillalpha = 0.35,c=1,label="Wasserstein Distance")
+	#cdf of target distribution
+	plot!(query,cdf(tdis,query),linewidth=2,label="actual distribution")
+	#cdf of empiric distribution
+	plot!(x,y,label="prediction",linewidth=2,ylabel="culumative density function",xlabel="function values")
 end
 
 # ╔═╡ 559975de-6566-4f66-87aa-4c71d2635a4a
-@bind ddd Slider(1:200)
+@bind query_point_ix Slider(1:200)
 
 # ╔═╡ 17f8c4fe-34b9-4e76-a615-3bc6d12b5b35
+#returns index position in array
 function ixin(y,array)
 	i=0
 	while array[i+1]<y && i<nop-1
@@ -361,16 +419,16 @@ function ixin(y,array)
 end
 
 # ╔═╡ 827a3dfc-a5ce-4af0-b77a-607a573a0b93
-function fdiff(y,pts,tdis) 
+function diffCDFandEmpiric(y,pts,tdis) 
 	return abs(ixin(y,pts)/nop-cdf(tdis,y))
 end
 
 # ╔═╡ d070d14a-0597-4b56-8efa-0371934a1242
 begin
-	function wasserdis(y_distest)
+	function wasserdis(y_distanceeval)
 		sum=0
 		for idx=1:200
-			pts=sort(y_distest[:,idx])
+			pts=sort(y_distanceeval[:,idx])
 			vals=collect(range(0.0,1,nop))
 			x=[pts[1]-1]
 			y=[0]
@@ -380,10 +438,12 @@ begin
 			end
 			x=vcat(x,[pts[nop]+1])
 			y=vcat(y,[1])
+			#lower and upper limit for integration
 			lower=min(x[1],fexact(x_samples[idx])-1)
 			upper=max(last(x),fexact(x_samples[idx])+1)
+			#target distribution
 			tdis=Normal(fexact(x_samples[idx]),1/4)
-			sum=sum+quadgk(z -> fdiff(z,pts,tdis), lower,upper)[1]
+			sum=sum+quadgk(z -> diffCDFandEmpiric(z,pts,tdis), lower,upper)[1]
 		end
 		sum=sum/200
 		return sum
@@ -391,43 +451,58 @@ begin
 end
 
 # ╔═╡ 813d1dda-a39b-474c-a0c2-891695e47ae8
-# ╠═╡ disabled = true
-#=╠═╡
 begin
+	#vector of iterations the wasserstein distance should be evaluated at
 	evals 			= convert(Vector{Int64},vcat(1,collect(range(iterations/10,iterations,10))))
+	#Wasserstein Distance averaged over all query points
 	distances 		= zeros(length(evals))
-	y_distest 		= zeros(length(evals),nop,samples)
+	y_distanceeval 	= zeros(length(evals),nop,samples)
 	for j=1:length(evals)			
 		for i=1:nop
-				p_distest=vector_to_parameters(particles_it[evals[j],i,:],parameters)
-				y_distest[j,i,:] 	= model(x_samples,p_distest,layer_states)[1]'
+				p_distanceeval=vector_to_parameters(particles_it[evals[j],i,:],parameters)
+				y_distanceeval[j,i,:] 	= model(x_samples,p_distanceeval,layer_states)[1]'
 		end
-		distances[j]=wasserdis(y_distest[j,:,:])
+		distances[j]=wasserdis(y_distanceeval[j,:,:])
 	end
-	plot(evals,distances,label="Wasserstein distance",xlabel="Iterations",ylabel="wasserstein distance",xaxis=:log,yaxis=:log,ylims=(0.1,NaN))
 end
-  ╠═╡ =#
+
+# ╔═╡ 0ccb78e6-3361-40e3-ab5e-74e546880769
+plot(evals,distances,label="Wasserstein distance",xlabel="Iterations",ylabel="wasserstein distance",xaxis=:log,yaxis=:log,ylims=(0.1,NaN))
 
 # ╔═╡ 2db5a537-d78b-4128-9208-edc1f80f7298
-#=╠═╡
 plot(evals,distances,label="Wasserstein distance",xlabel="Iterations",ylabel="wasserstein distance",ylims=(0,maximum(distances)))
-  ╠═╡ =#
 
 # ╔═╡ 3de9e969-8dab-4277-a778-4bc57537b374
-#=╠═╡
 [minimum(distances),distances[end]]
-  ╠═╡ =#
 
-# ╔═╡ b256e0df-b100-4a4a-ab8e-4a7f3ff91881
-#=╠═╡
-pltwasser(y_distest[10,:,:],ddd)
-  ╠═╡ =#
+# ╔═╡ fdda0e69-0880-449a-9f0e-e60757688dea
+pltwasserdis(y_distanceeval[10,:,:],query_point_ix)
 
 # ╔═╡ 38a08ffe-9582-44a2-98cf-c60b0cd39a73
 md"""##### Saving results"""
 
 # ╔═╡ cc429ee4-9151-4f5f-831c-eb20797c1593
 #jldsave("filename.jld2"; result=particles_it)
+
+# ╔═╡ b3ba13c2-3389-43a9-bb95-87ab6fbcb5c4
+# ╠═╡ disabled = true
+#=╠═╡
+begin
+	@load "TestResults\\tests_par_64_bw_01.jld2" 
+	particles_it=result
+	iterations=2000
+end;
+  ╠═╡ =#
+
+# ╔═╡ 94f7c5c0-0b9c-4a91-a806-a25b94658c1c
+begin
+	iterations 			= 1000
+	particles_it 		= zeros(iterations+1,nop,n_params)
+	particles_it[1,:,:] = particles_init'
+	for i = 1:iterations
+		particles_it[i+1,:,:] = svgd_onlyFinalResult(nop,particles_it[i,:,:],n_params,1,.2,update,kernel,grad_kernel)
+	end
+end;
 
 # ╔═╡ 00000000-0000-0000-0000-000000000001
 PLUTO_PROJECT_TOML_CONTENTS = """
@@ -2224,7 +2299,7 @@ version = "1.4.1+1"
 # ╟─ce57cbad-1508-4f2c-98d9-2692c4440156
 # ╟─0dced725-8be1-492b-8c73-bc170f065b13
 # ╟─b1a9632e-479b-4d7e-acba-7800c564c7f2
-# ╠═c6f6cd0a-ee38-4e7e-a3ab-70e578eefb37
+# ╟─c6f6cd0a-ee38-4e7e-a3ab-70e578eefb37
 # ╠═637ededd-5df0-43f9-91cd-44e861e857a9
 # ╟─ab0cf529-a7a9-417e-829e-a6325480de32
 # ╟─8632d6f5-c69f-4c45-9a70-e78dbbccc1c3
@@ -2232,29 +2307,46 @@ version = "1.4.1+1"
 # ╟─619bba9d-3263-4868-acff-cb753e947a78
 # ╠═ec8f8851-2595-4252-a1c7-3fbb24cc39b1
 # ╠═e89720c7-0436-4d8b-a1e2-6415397e2e0e
+# ╟─2c759c0d-bb3f-41fe-a975-ccb04d0c6bea
 # ╠═bc054a9a-bf9d-4654-87d7-93aee5392c26
+# ╟─66f9b63e-8cd4-4a8c-bd8e-25f9905fdb12
 # ╠═26448ee3-f2f6-421d-ab4b-e35e515619d3
 # ╟─8c23ee52-1748-4d5b-a051-0c07fe4b5765
+# ╟─db9de9f0-d895-4ae0-9cce-a374e6b7c26c
+# ╠═b3ba13c2-3389-43a9-bb95-87ab6fbcb5c4
+# ╟─87d89336-f3ab-49b9-8516-f195dea9ed44
 # ╠═94f7c5c0-0b9c-4a91-a806-a25b94658c1c
 # ╟─54f50b52-3822-445c-9c47-b74de425c92d
 # ╠═8299f3bb-55d3-4ddc-849d-108df3ccb93b
 # ╠═813d1dda-a39b-474c-a0c2-891695e47ae8
+# ╟─a851b2b6-7fc4-4846-9ec1-028bde78d183
+# ╟─0ccb78e6-3361-40e3-ab5e-74e546880769
+# ╟─14edea53-261d-4651-bb24-624749d39cef
 # ╟─2db5a537-d78b-4128-9208-edc1f80f7298
-# ╠═3de9e969-8dab-4277-a778-4bc57537b374
+# ╟─f54d8b59-00af-41ab-8e94-fa1a6685113b
+# ╟─3de9e969-8dab-4277-a778-4bc57537b374
+# ╟─4c34164b-bb2a-4064-be42-2f99f6c9e3b4
 # ╟─01e72291-31f9-4978-afbb-013906c9cab7
+# ╟─a754a107-9cdf-4759-9144-366da803ca68
 # ╟─adfa6f4b-a9cc-4491-b918-1e56f8e19217
+# ╟─a497734d-1b2d-42ed-907f-6f79de521635
 # ╟─495f05b2-f16a-44b4-943a-e75df45db211
-# ╟─62764414-8612-40bd-b87f-6ea8a9de37c0
 # ╟─e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
+# ╟─7cf103a4-ef2b-4715-83e7-dc4586d498d1
+# ╟─62764414-8612-40bd-b87f-6ea8a9de37c0
+# ╟─df3039a7-9b7a-45b0-bc7a-49106a31641b
 # ╟─b12ed512-7264-41ed-bf93-da6425e7576e
+# ╟─34e71596-9c53-4c94-8fed-aa773c81b548
 # ╠═0871844d-80b9-4296-9f13-99c52be2c8c3
 # ╠═8c7c29dd-0120-4c2c-abf8-ca04cb25cc98
-# ╠═3b5d7fae-1de0-4e21-8cba-28c3558fef47
+# ╟─3b5d7fae-1de0-4e21-8cba-28c3558fef47
 # ╠═a2fa97d9-2b0e-4096-ad8c-64e264d28804
+# ╟─f762ade5-f653-4008-a4d6-d26e2b713576
 # ╠═d070d14a-0597-4b56-8efa-0371934a1242
+# ╟─feb43347-712d-4978-821d-047e82de38e8
 # ╠═04016383-d2ed-4ab7-8523-730083eca4c3
 # ╠═559975de-6566-4f66-87aa-4c71d2635a4a
-# ╠═b256e0df-b100-4a4a-ab8e-4a7f3ff91881
+# ╟─fdda0e69-0880-449a-9f0e-e60757688dea
 # ╠═17f8c4fe-34b9-4e76-a615-3bc6d12b5b35
 # ╠═827a3dfc-a5ce-4af0-b77a-607a573a0b93
 # ╟─38a08ffe-9582-44a2-98cf-c60b0cd39a73
