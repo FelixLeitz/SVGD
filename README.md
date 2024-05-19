@@ -3,4 +3,4 @@ Contains the code used for my project work **Applicability of SVGD for high-dime
 
 To properly understand everything, basic knowledge of neural networks and sampling methods is required.
 
-The main goal of the presented work is to assess wether it is feasible to use SVGD for uncertainty quantification in neural networks. The combination of SVGD and NNs poses an interesting task, as Bayesian inference on neural networks is a non-trivial problem especially with large networks. 
+The main goal of the presented work is to assess wether it is feasible to use SVGD for uncertainty quantification in neural networks. The combination of SVGD and NNs poses an interesting task, as Bayesian inference on neural networks is a non-trivial problem especially with large networks. Furthermore, with SVGD being a gradient-based method the straightforward gradient access in a neural network is helpful.
