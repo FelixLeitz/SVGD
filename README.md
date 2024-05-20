@@ -15,4 +15,10 @@ The main goal of the presented work is to assess wether it is feasible to use SV
   year	={2016},
   institution={Dartmouth College}
 }
+
+@misc{BayesianNeuralNetworks,
+  title={Hands-on Bayesian Neural Networks – A Tutorial for Deep Learning Users},
+  author={Laurent Valentin Jospin and Hamid Laga and Farid Boussaid and Wray Buntine and Mohammed Bennamoun},
+  year={2022}
+}
 ```
