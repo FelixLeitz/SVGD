@@ -8,11 +8,11 @@ The main goal of the presented work is to assess wether it is feasible to use SV
 
 ## Sources
 
-'''
+```
 @misc{SVGDintro,
   title	={Stein Variational Gradient Descent: A general purpose Bayesian inference algorithm},
   author={Qiang Liu and Dilin Wang},
   year	={2016},
   institution={Dartmouth College}
 }
-'''
+```
