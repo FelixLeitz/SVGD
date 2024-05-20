@@ -9,16 +9,27 @@ The main goal of the presented work is to assess wether it is feasible to use SV
 ## Sources
 
 ```
-@misc{SVGDintro,
-  title	={Stein Variational Gradient Descent: A general purpose Bayesian inference algorithm},
-  author={Qiang Liu and Dilin Wang},
-  year	={2016},
-  institution={Dartmouth College}
+@misc{liu2019stein,
+      title={Stein Variational Gradient Descent: A General Purpose Bayesian Inference Algorithm}, 
+      author={Qiang Liu and Dilin Wang},
+      year={2019},
+      eprint={1608.04471},
+      archivePrefix={arXiv},
+      primaryClass={stat.ML}
 }
 
-@misc{BayesianNeuralNetworks,
-  title={Hands-on Bayesian Neural Networks – A Tutorial for Deep Learning Users},
-  author={Laurent Valentin Jospin and Hamid Laga and Farid Boussaid and Wray Buntine and Mohammed Bennamoun},
-  year={2022}
+@article{Jospin_2022,
+   title={Hands-On Bayesian Neural Networks—A Tutorial for Deep Learning Users},
+   volume={17},
+   ISSN={1556-6048},
+   url={http://dx.doi.org/10.1109/MCI.2022.3155327},
+   DOI={10.1109/mci.2022.3155327},
+   number={2},
+   journal={IEEE Computational Intelligence Magazine},
+   publisher={Institute of Electrical and Electronics Engineers (IEEE)},
+   author={Jospin, Laurent Valentin and Laga, Hamid and Boussaid, Farid and Buntine, Wray and Bennamoun, Mohammed},
+   year={2022},
+   month=may,
+   pages={29–48}
 }
 ```
