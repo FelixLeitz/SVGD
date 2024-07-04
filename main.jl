@@ -36,7 +36,7 @@ begin
 end
 
 # ╔═╡ d8468e73-0442-4230-92da-8dbda2173bf5
-include("C:\\Users\\felix\\Documents\\SVGD\\stein_variational_gradient_descent.jl")
+include("stein_variational_gradient_descent.jl")
 
 # ╔═╡ 4292c47d-0282-437c-8684-d4adfae01931
 md"""# Bayesian Neural Network(BNN)"""
@@ -181,7 +181,7 @@ begin
 	#standard deviation of the prior
 	σ 	 				= 1
 	#number of particles used for SVGD
-	nop 				= 20
+	nop 				= 64
 	#number of params for the neural network
 	n_params 			= Lux.parameterlength(parameters)
 	#define prior mean and variance
@@ -344,21 +344,21 @@ begin
 	scatter(xpart',ypart,label="")
 end
 
-# ╔═╡ e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
+# ╔═╡ 29e7a4c9-ab4b-446e-af90-189297eaef6e
 begin
-	xpart2=repeat(x_samples,1,nop)
-	ypart2=y_final[1,:]
+	xpartend=repeat(x_samples,1,nop)
+	ypartend=y_final[1,:]
 	for i=2:nop
-		ypart2=vcat(ypart2,y_final[i,:])
+		ypartend=vcat(ypartend,y_final[i,:])
 	end
-	scatter(xpart2',ypart2,label="")
+	fig8=scatter(xpartend',ypartend,label="BNN predictions")
 end
 
 # ╔═╡ 62764414-8612-40bd-b87f-6ea8a9de37c0
 begin
 	lower 		= means.-mins 
 	upper 		= maxs.-means
-	plot(x_samples',means;ribbon=(lower,upper),label="BNN prediction")
+	fig7=plot(x_samples',means;ribbon=(lower,upper),label="BNN prediction",ylims=(-2.5,3.5))
 	plot!(x_samples',exact;ribbon=(exact.-exactmin,exactmax.-exact),label="2σ-quantile of exact function")
 	scatter!(x_samples',f_samples',label="training data")	
 end
@@ -482,11 +482,7 @@ pltwasserdis(y_distanceeval[10,:,:],query_point_ix)
 md"""##### Saving results"""
 
 # ╔═╡ cc429ee4-9151-4f5f-831c-eb20797c1593
-<<<<<<< HEAD
 #jldsave("Example.jld2"; result=particles_it)
-=======
-#jldsave("filename.jld2"; result=particles_it)
->>>>>>> parent of be68b1e (Final Push)
 
 # ╔═╡ b3ba13c2-3389-43a9-bb95-87ab6fbcb5c4
 # ╠═╡ disabled = true
@@ -498,9 +494,9 @@ begin
 end;
   ╠═╡ =#
 
-# ╔═╡ 94f7c5c0-0b9c-4a91-a806-a25b94658c1c
+# ╔═╡ 34a2fdfb-2a5e-48d6-9618-16b0fe93f496
 begin
-	iterations 			= 1000
+	iterations 			= 20000
 	particles_it 		= zeros(iterations+1,nop,n_params)
 	particles_it[1,:,:] = particles_init'
 	for i = 1:iterations
@@ -2319,7 +2315,7 @@ version = "1.4.1+1"
 # ╟─db9de9f0-d895-4ae0-9cce-a374e6b7c26c
 # ╠═b3ba13c2-3389-43a9-bb95-87ab6fbcb5c4
 # ╟─87d89336-f3ab-49b9-8516-f195dea9ed44
-# ╠═94f7c5c0-0b9c-4a91-a806-a25b94658c1c
+# ╠═34a2fdfb-2a5e-48d6-9618-16b0fe93f496
 # ╟─54f50b52-3822-445c-9c47-b74de425c92d
 # ╠═8299f3bb-55d3-4ddc-849d-108df3ccb93b
 # ╠═813d1dda-a39b-474c-a0c2-891695e47ae8
@@ -2335,9 +2331,9 @@ version = "1.4.1+1"
 # ╟─adfa6f4b-a9cc-4491-b918-1e56f8e19217
 # ╟─a497734d-1b2d-42ed-907f-6f79de521635
 # ╟─495f05b2-f16a-44b4-943a-e75df45db211
-# ╟─e6598a04-1fc7-40d1-acef-e7fc5f8ea71e
+# ╟─29e7a4c9-ab4b-446e-af90-189297eaef6e
 # ╟─7cf103a4-ef2b-4715-83e7-dc4586d498d1
-# ╟─62764414-8612-40bd-b87f-6ea8a9de37c0
+# ╠═62764414-8612-40bd-b87f-6ea8a9de37c0
 # ╟─df3039a7-9b7a-45b0-bc7a-49106a31641b
 # ╟─b12ed512-7264-41ed-bf93-da6425e7576e
 # ╟─34e71596-9c53-4c94-8fed-aa773c81b548
@@ -2346,9 +2342,9 @@ version = "1.4.1+1"
 # ╟─3b5d7fae-1de0-4e21-8cba-28c3558fef47
 # ╠═a2fa97d9-2b0e-4096-ad8c-64e264d28804
 # ╟─f762ade5-f653-4008-a4d6-d26e2b713576
-# ╠═d070d14a-0597-4b56-8efa-0371934a1242
+# ╟─d070d14a-0597-4b56-8efa-0371934a1242
 # ╟─feb43347-712d-4978-821d-047e82de38e8
-# ╠═04016383-d2ed-4ab7-8523-730083eca4c3
+# ╟─04016383-d2ed-4ab7-8523-730083eca4c3
 # ╠═559975de-6566-4f66-87aa-4c71d2635a4a
 # ╟─fdda0e69-0880-449a-9f0e-e60757688dea
 # ╠═17f8c4fe-34b9-4e76-a615-3bc6d12b5b35
