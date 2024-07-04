@@ -8,19 +8,32 @@ The main goal of the presented work is to assess wether it is feasible to use SV
 
 ## Setup
 The key parameters/parts of the main.jl script are:
+
 ***layers*** 1d-array with layer structure of the neural network
+
 ***f*** data generating function
+
 ***loss_function*** empiric loss function of the neural network
+
 ***σ*** variance of bayesian prior
+
 ***nop*** number of particles used for the SVGD algorithm
+
 ***bandwidth*** kernel bandwidth
+
 ***iterations*** number of iterations for which svgd is performed
 
+
 To see if the script is working try:
+
 layers=[1 4 4 1]
+
 σ=1
+
 nop=64
+
 bandwidth=5
+
 iterations=20000
 
 This should yield the following results:
