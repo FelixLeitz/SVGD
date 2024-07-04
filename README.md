@@ -36,6 +36,8 @@ bandwidth=5
 
 iterations=20000
 
+rng seed=42
+
 This should yield the following results:
 
 ![image info](ExamplePredictions.png)
