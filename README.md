@@ -38,6 +38,7 @@ iterations=20000
 
 This should yield the following results:
 
+![image info](ExamplePredictions.png)
 
 ## Sources
 
